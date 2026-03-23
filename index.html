@@ -343,6 +343,30 @@
   </div>
 </div>
 
+<!-- ===== MOBILE BOTTOM NAV ===== -->
+<nav class="mobile-bottom-nav" id="mobileBottomNav">
+  <button class="mob-nav-btn active" id="mobHome" onclick="showSection('home');setMobActive('mobHome')">
+    <span class="mob-icon">🏠</span>
+    <span>Home</span>
+  </button>
+  <button class="mob-nav-btn" id="mobSearch" onclick="focusMobileSearch();setMobActive('mobSearch')">
+    <span class="mob-icon">🔍</span>
+    <span>Search</span>
+  </button>
+  <button class="mob-nav-btn" id="mobLiked" onclick="showSection('liked');setMobActive('mobLiked')">
+    <span class="mob-icon">❤️</span>
+    <span>Liked</span>
+  </button>
+  <button class="mob-nav-btn" id="mobPlaylists" onclick="showSection('playlists');setMobActive('mobPlaylists')">
+    <span class="mob-icon">📂</span>
+    <span>Playlists</span>
+  </button>
+  <button class="mob-nav-btn" id="mobAccount" onclick="showSection('account');setMobActive('mobAccount')">
+    <span class="mob-icon">👤</span>
+    <span>Account</span>
+  </button>
+</nav>
+
 <audio id="audioPlayer"></audio>
 <script src="app.js"></script>
 </body>
