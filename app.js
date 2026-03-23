@@ -642,6 +642,9 @@ function showSection(name) {
   const map = { home: 'homeSection', search: 'homeSection', liked: 'likedSection', playlists: 'playlistsSection', account: 'accountSection' };
   const el = document.getElementById(map[name]);
   if (el) el.classList.remove('hidden');
+  // Sync mobile bottom nav
+  const mobMap = { home: 'mobHome', search: 'mobSearch', liked: 'mobLiked', playlists: 'mobPlaylists', account: 'mobAccount' };
+  if (mobMap[name]) setMobActive(mobMap[name]);
   if (name === 'liked') renderLikedSection();
   if (name === 'playlists') { renderPlaylistsSection(); document.getElementById('playlistDetail').classList.add('hidden'); document.getElementById('playlistsGrid').classList.remove('hidden'); currentOpenPlaylistId = null; }
   if (name === 'account') renderAccountSection();
@@ -759,8 +762,23 @@ function showToast(msg) {
 }
 function showMsg(id, msg) { const el = document.getElementById(id); if (el) el.textContent = msg; }
 
-// ===== UTILS =====
-function esc(str) {
+// ===== MOBILE BOTTOM NAV =====
+function setMobActive(id) {
+  document.querySelectorAll('.mob-nav-btn').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+
+function focusMobileSearch() {
+  showSection('home');
+  const input = document.getElementById('globalSearch');
+  if (input) {
+    setTimeout(() => {
+      input.focus();
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  }
+}
   if (!str) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
