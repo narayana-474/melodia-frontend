@@ -513,13 +513,28 @@ function renderQueue() {
     ? upcoming.map((s, i) => queueItemHTML(s, currentSongIndex + 1 + i, false)).join('')
     : '<div style="color:var(--text-muted);font-size:13px;padding:8px;">No songs in queue</div>';
 }
+
 function queueItemHTML(song, idx, isNow) {
   return `<div class="queue-item ${isNow ? 'playing-now' : ''}" onclick="${isNow ? '' : `jumpToQueue(${idx})`}">
     ${song.coverUrl ? `<img class="queue-cover" src="${song.coverUrl}" alt="" />` : `<div class="queue-cover-ph">🎵</div>`}
-    <div class="queue-meta"><div class="queue-title">${esc(song.songName)}</div><div class="queue-artist">${esc(song.singer)}</div></div>
-    ${isNow ? '<span style="color:var(--accent);font-size:11px;flex-shrink:0;">▶ Playing</span>' : `<span class="queue-idx">${idx - currentSongIndex}</span>`}
+    <div class="queue-meta">
+      <div class="queue-title">${esc(song.songName)}</div>
+      <div class="queue-artist">${esc(song.singer || '')}</div>
+    </div>
+    ${isNow
+      ? '<span style="color:var(--accent);font-size:11px;flex-shrink:0;">▶ Now</span>'
+      : `<button class="queue-remove-btn" onclick="event.stopPropagation(); removeFromQueue(${idx})" title="Remove">✕</button>`
+    }
   </div>`;
 }
+
+function removeFromQueue(idx) {
+  currentQueue.splice(idx, 1);
+  // Adjust currentSongIndex if needed
+  if (idx < currentSongIndex) currentSongIndex--;
+  renderQueue();
+}
+
 function jumpToQueue(idx) { currentSongIndex = idx; loadAndPlay(); renderQueue(); }
 
 // ===== LIKED SONGS =====
@@ -539,8 +554,18 @@ async function toggleLike(id) {
   if (currentUser?.isGuest) return showToast('Please login to like songs!');
   if (isLiked(id)) likedSongs = likedSongs.filter(i => i !== id); else likedSongs.push(id);
   await saveLikedSongs();
-  document.querySelectorAll(`[id="likeBtn-${id}"]`).forEach(btn => { btn.textContent = isLiked(id) ? '❤️' : '🤍'; btn.classList.toggle('liked', isLiked(id)); });
-  if (currentQueue[currentSongIndex]?._id === id) document.getElementById('npLikeBtn').textContent = isLiked(id) ? '❤️' : '🤍';
+  const liked = isLiked(id);
+  const emoji = liked ? '❤️' : '🤍';
+  // Update all song card like buttons
+  document.querySelectorAll(`[id="likeBtn-${id}"]`).forEach(btn => {
+    btn.textContent = emoji; btn.classList.toggle('liked', liked);
+  });
+  // Sync mini bar like button
+  const miniLike = document.getElementById('npLikeBtn');
+  if (miniLike && currentQueue[currentSongIndex]?._id === id) miniLike.textContent = emoji;
+  // Sync fullscreen like button
+  const fsLike = document.getElementById('npfsLikeBtn');
+  if (fsLike && currentQueue[currentSongIndex]?._id === id) fsLike.textContent = emoji;
   renderLikedSection();
 }
 function toggleLikeCurrent() { const s = currentQueue[currentSongIndex]; if (s) toggleLike(s._id); }
@@ -866,6 +891,7 @@ function focusMobileSearch() {
     }, 100);
   }
 }
+
 function esc(str) {
   if (!str) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
