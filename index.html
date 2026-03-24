@@ -290,7 +290,7 @@
 <div class="np-fullscreen hidden" id="npFullscreen">
   <!-- Header -->
   <div class="npfs-header">
-    <button class="npfs-down-btn" onclick="closeNowPlayingScreen()">
+    <button class="npfs-down-btn" id="npfsDownBtn" onclick="closeNowPlayingScreen()">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
     </button>
     <div class="npfs-header-info">
@@ -309,7 +309,6 @@
   <div class="npfs-info-row">
     <div class="npfs-info">
       <div class="npfs-title" id="npfsTitle">No song playing</div>
-      <!-- Scrolling marquee for music director + singers -->
       <div class="npfs-marquee-wrap">
         <div class="npfs-marquee" id="npfsMarquee">—</div>
       </div>
@@ -321,7 +320,6 @@
   <div class="npfs-progress-wrap">
     <div class="npfs-progress-bar" id="npfsProgressBar" onclick="seekSong(event)">
       <div class="npfs-progress-fill" id="npfsProgressFill"></div>
-      <div class="npfs-progress-thumb" id="npfsProgressThumb"></div>
     </div>
     <div class="npfs-times">
       <span id="npfsCurrentTime">0:00</span>
@@ -329,11 +327,11 @@
     </div>
   </div>
 
-  <!-- Controls -->
+  <!-- Controls: Queue | Prev | Play/Pause | Next | Loop -->
   <div class="npfs-controls">
-    <!-- Shuffle -->
-    <button class="npfs-ctrl-btn mode" id="npfsShuffleBtn" onclick="toggleShuffle()" title="Shuffle">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M17 4l4 4-4 4V9h-2.3c-.8 0-1.5.4-1.9 1L9.2 15c-.7 1-1.9 1.7-3.2 1.7H3v-2h3c.8 0 1.5-.4 1.9-1l3.6-5C12.2 7.6 13.4 7 14.7 7H17V4zm-10 1H3V3h4c1.3 0 2.5.6 3.2 1.7l.8 1.1-1.5 2-.7-1c-.4-.5-1.1-.8-1.8-.8zm9.7 9.3c.4.6 1.1 1 1.8 1H21v2h-2.5c-1.3 0-2.5-.6-3.2-1.7l-.8-1.1 1.5-2 .7 1z"/></svg>
+    <!-- Queue (replaces Shuffle) -->
+    <button class="npfs-ctrl-btn mode" onclick="toggleQueue(); closeNowPlayingScreen();" title="Queue">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h16v2H4zm2 5h12v2H6zm2 5h8v2H8z"/></svg>
     </button>
     <!-- Prev -->
     <button class="npfs-ctrl-btn" onclick="prevSong()">
@@ -352,15 +350,6 @@
     <button class="npfs-ctrl-btn mode" id="npfsLoopBtn" onclick="cycleLoop()" title="Loop">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
       <span id="npfsLoopBadge" class="npfs-loop-badge hidden">1</span>
-    </button>
-  </div>
-
-  <!-- Bottom row: Queue icon (like Spotify's queue at bottom right) -->
-  <div class="npfs-bottom-row">
-    <div style="flex:1;"></div>
-    <button class="npfs-bottom-btn" onclick="toggleQueue(); closeNowPlayingScreen();">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/></svg>
-      <span>Queue</span>
     </button>
   </div>
 </div>
