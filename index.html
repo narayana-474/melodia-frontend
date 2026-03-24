@@ -10,7 +10,6 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
 </head>
 <body>
 
@@ -227,16 +226,18 @@
   </main>
 </div>
 
-<!-- NOW PLAYING BAR -->
-<div class="now-playing-bar">
-  <div class="np-song-info">
+<!-- ===== MINI NOW PLAYING BAR (shows on desktop + mobile bottom) ===== -->
+<div class="now-playing-bar" id="nowPlayingBar">
+  <!-- Left: cover + song info (clickable to open full screen on mobile) -->
+  <div class="np-song-info" onclick="openNowPlayingScreen()">
     <img id="npCover" src="" alt="cover" class="np-cover" />
     <div class="np-meta">
       <div class="np-title" id="npTitle">No song playing</div>
       <div class="np-artist" id="npArtist">—</div>
     </div>
-    <button class="np-like-btn" id="npLikeBtn" onclick="toggleLikeCurrent()">🤍</button>
   </div>
+
+  <!-- Center: controls + progress (desktop only) -->
   <div class="np-center">
     <div class="np-controls">
       <button class="ctrl-btn mode-btn" id="shuffleBtn" onclick="toggleShuffle()" title="Shuffle">
@@ -246,7 +247,7 @@
       <button class="ctrl-btn play-btn" id="playPauseBtn" onclick="togglePlayPause()">▶</button>
       <button class="ctrl-btn" onclick="nextSong()">⏭</button>
       <button class="ctrl-btn mode-btn" id="loopBtn" onclick="cycleLoop()" title="Loop">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" id="loopIcon"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
         <span id="loopBadge" class="loop-badge hidden">1</span>
       </button>
     </div>
@@ -258,6 +259,8 @@
       <span class="time-label" id="totalTime">0:00</span>
     </div>
   </div>
+
+  <!-- Desktop right: volume -->
   <div class="np-right">
     <button class="ctrl-btn mode-btn" id="queueBtn" onclick="toggleQueue()" title="Queue">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/></svg>
@@ -266,6 +269,99 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color:var(--text-dim);flex-shrink:0;"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
       <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.8" oninput="setVolume(this.value)" />
     </div>
+  </div>
+
+  <!-- Mobile right: Queue + Like + Play/Pause -->
+  <div class="np-mobile-actions">
+    <button class="np-mob-btn" onclick="event.stopPropagation(); toggleQueue();" title="Queue">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M4 6h16v2H4zm2 5h12v2H6zm2 5h8v2H8z"/>
+      </svg>
+    </button>
+    <button class="np-mob-btn np-mob-like" id="npLikeBtn" onclick="event.stopPropagation(); toggleLikeCurrent();">🤍</button>
+    <button class="np-mob-btn np-mob-play" id="playPauseBtnMob" onclick="event.stopPropagation(); togglePlayPause();">
+      <svg id="mobPlayIcon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      <svg id="mobPauseIcon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" class="hidden"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ===== FULL SCREEN NOW PLAYING (mobile) ===== -->
+<div class="np-fullscreen hidden" id="npFullscreen">
+  <!-- Header -->
+  <div class="npfs-header">
+    <button class="npfs-down-btn" onclick="closeNowPlayingScreen()">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+    </button>
+    <div class="npfs-header-info">
+      <span class="npfs-from">NOW PLAYING</span>
+    </div>
+    <div style="width:40px;"></div>
+  </div>
+
+  <!-- Cover Art -->
+  <div class="npfs-cover-wrap">
+    <img id="npfsCover" src="" alt="" class="npfs-cover" />
+    <div id="npfsCoverPh" class="npfs-cover-ph">🎵</div>
+  </div>
+
+  <!-- Song Info + Like -->
+  <div class="npfs-info-row">
+    <div class="npfs-info">
+      <div class="npfs-title" id="npfsTitle">No song playing</div>
+      <!-- Scrolling marquee for music director + singers -->
+      <div class="npfs-marquee-wrap">
+        <div class="npfs-marquee" id="npfsMarquee">—</div>
+      </div>
+    </div>
+    <button class="npfs-like-btn" id="npfsLikeBtn" onclick="toggleLikeCurrent()">🤍</button>
+  </div>
+
+  <!-- Progress Bar -->
+  <div class="npfs-progress-wrap">
+    <div class="npfs-progress-bar" id="npfsProgressBar" onclick="seekSong(event)">
+      <div class="npfs-progress-fill" id="npfsProgressFill"></div>
+      <div class="npfs-progress-thumb" id="npfsProgressThumb"></div>
+    </div>
+    <div class="npfs-times">
+      <span id="npfsCurrentTime">0:00</span>
+      <span id="npfsTotalTime">0:00</span>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="npfs-controls">
+    <!-- Shuffle -->
+    <button class="npfs-ctrl-btn mode" id="npfsShuffleBtn" onclick="toggleShuffle()" title="Shuffle">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M17 4l4 4-4 4V9h-2.3c-.8 0-1.5.4-1.9 1L9.2 15c-.7 1-1.9 1.7-3.2 1.7H3v-2h3c.8 0 1.5-.4 1.9-1l3.6-5C12.2 7.6 13.4 7 14.7 7H17V4zm-10 1H3V3h4c1.3 0 2.5.6 3.2 1.7l.8 1.1-1.5 2-.7-1c-.4-.5-1.1-.8-1.8-.8zm9.7 9.3c.4.6 1.1 1 1.8 1H21v2h-2.5c-1.3 0-2.5-.6-3.2-1.7l-.8-1.1 1.5-2 .7 1z"/></svg>
+    </button>
+    <!-- Prev -->
+    <button class="npfs-ctrl-btn" onclick="prevSong()">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+    </button>
+    <!-- Play/Pause -->
+    <button class="npfs-play-btn" id="npfsPlayPauseBtn" onclick="togglePlayPause()">
+      <svg id="npfsPlayIcon" width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      <svg id="npfsPauseIcon" width="32" height="32" viewBox="0 0 24 24" fill="currentColor" class="hidden"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+    </button>
+    <!-- Next -->
+    <button class="npfs-ctrl-btn" onclick="nextSong()">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2-8.14L11.03 12 8 14.14V9.86zM16 6h2v12h-2z"/></svg>
+    </button>
+    <!-- Loop -->
+    <button class="npfs-ctrl-btn mode" id="npfsLoopBtn" onclick="cycleLoop()" title="Loop">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+      <span id="npfsLoopBadge" class="npfs-loop-badge hidden">1</span>
+    </button>
+  </div>
+
+  <!-- Bottom row: Queue icon (like Spotify's queue at bottom right) -->
+  <div class="npfs-bottom-row">
+    <div style="flex:1;"></div>
+    <button class="npfs-bottom-btn" onclick="toggleQueue(); closeNowPlayingScreen();">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/></svg>
+      <span>Queue</span>
+    </button>
   </div>
 </div>
 
@@ -284,6 +380,7 @@
     <div id="queueList"></div>
   </div>
 </div>
+
 
 <!-- MODALS -->
 <div id="createPlaylistModal" class="modal-overlay hidden">
