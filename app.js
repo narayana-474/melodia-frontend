@@ -240,26 +240,29 @@ function renderSongsGrid(songs, containerId) {
   const grid = document.getElementById(containerId);
   if (!grid) return;
   if (!songs.length) { grid.innerHTML = '<div style="color:var(--text-muted);font-size:14px;padding:20px 0;">No songs found.</div>'; return; }
-  grid.innerHTML = songs.map(song => {
-    const liked = isLiked(song._id);
-    return `
-      <div class="song-card" onclick="openSongDetail('${song._id}')">
-        ${song.coverUrl ? `<img class="song-card-cover" src="${song.coverUrl}" alt="${esc(song.songName)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />` : ''}
-        <div class="song-card-cover-placeholder" style="${song.coverUrl ? 'display:none' : ''}">🎵</div>
-        <div class="song-card-play-overlay">
-          <button class="song-card-play-btn" onclick="event.stopPropagation();playSong('${song._id}')">▶</button>
-        </div>
-        <div class="song-card-actions">
-          <button class="card-action-btn ${liked ? 'liked' : ''}" onclick="event.stopPropagation();toggleLike('${song._id}')" id="likeBtn-${song._id}">${liked ? '❤️' : '🤍'}</button>
-          <button class="card-action-btn" title="Add to Queue" onclick="event.stopPropagation();addToQueue('${song._id}')">⏭️</button>
-          <button class="card-action-btn" title="Add to Playlist" onclick="event.stopPropagation();openAddToPlaylist('${song._id}')">➕</button>
-        </div>
-        <div class="song-card-info">
-          <div class="song-card-title">${esc(song.songName)}</div>
-          <div class="song-card-artist">${esc(song.singer)}</div>
-        </div>
-      </div>`;
-  }).join('');
+  grid.innerHTML = songs.map(song => `
+    <div class="song-card"
+      onclick="playSong('${song._id}')"
+      oncontextmenu="openContextMenu(event,'${song._id}')"
+      data-song-id="${song._id}">
+      ${song.coverUrl ? `<img class="song-card-cover" src="${song.coverUrl}" alt="${esc(song.songName)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />` : ''}
+      <div class="song-card-cover-placeholder" style="${song.coverUrl ? 'display:none' : ''}">🎵</div>
+      <div class="song-card-play-overlay">
+        <button class="song-card-play-btn" onclick="event.stopPropagation();playSong('${song._id}')">▶</button>
+      </div>
+      <div class="song-card-info">
+        <div class="song-card-title">${esc(song.songName)}</div>
+        <div class="song-card-artist">${esc(song.musicDirector || song.singer)}</div>
+      </div>
+    </div>`
+  ).join('');
+  // Add long-press for mobile
+  grid.querySelectorAll('.song-card').forEach(card => {
+    addLongPress(card, () => {
+      const id = card.getAttribute('data-song-id');
+      openContextMenu(null, id, card);
+    });
+  });
 }
 
 function renderSongsList(songs, containerId, showRemove = false, playlistId = null) {
@@ -267,24 +270,130 @@ function renderSongsList(songs, containerId, showRemove = false, playlistId = nu
   if (!el) return;
   if (!songs.length) { el.innerHTML = '<div style="color:var(--text-muted);font-size:14px;padding:20px 0;">No songs here yet.</div>'; return; }
   el.innerHTML = songs.map((song, i) => `
-    <div class="song-list-item ${currentQueue[currentSongIndex]?._id === song._id ? 'playing' : ''}" onclick="playSongFromList(${i}, '${containerId}')">
+    <div class="song-list-item ${currentQueue[currentSongIndex]?._id === song._id ? 'playing' : ''}"
+      onclick="playSongFromList(${i}, '${containerId}')"
+      oncontextmenu="openContextMenu(event,'${song._id}')"
+      data-song-id="${song._id}">
       ${song.coverUrl ? `<img class="song-list-cover" src="${song.coverUrl}" alt="" onerror="this.outerHTML='<div class=song-list-cover-ph>🎵</div>'" />` : `<div class="song-list-cover-ph">🎵</div>`}
       <div class="song-list-meta">
         <div class="song-list-title">${esc(song.songName)}</div>
-        <div class="song-list-artist">${esc(song.singer)} • ${esc(song.movieName)}</div>
+        <div class="song-list-artist">${esc(song.musicDirector || song.singer)} • ${esc(song.movieName)}</div>
       </div>
-      <div class="song-list-actions">
-        ${showRemove ? `<button class="card-action-btn" title="Remove" onclick="event.stopPropagation();removeSongFromPlaylist('${playlistId}','${song._id}')">🗑️</button>`
-                     : `<button class="card-action-btn ${isLiked(song._id) ? 'liked' : ''}" onclick="event.stopPropagation();toggleLike('${song._id}')">${isLiked(song._id) ? '❤️' : '🤍'}</button>`}
-        <button class="card-action-btn" title="Add to Queue" onclick="event.stopPropagation();addToQueue('${song._id}')">⏭️</button>
-        <button class="card-action-btn" title="Add to Playlist" onclick="event.stopPropagation();openAddToPlaylist('${song._id}')">➕</button>
-      </div>
+      ${showRemove ? `<button class="card-action-btn" title="Remove" onclick="event.stopPropagation();removeSongFromPlaylist('${playlistId}','${song._id}')">🗑️</button>` : ''}
     </div>`
   ).join('');
   el._songsList = songs;
+  // Add long-press for mobile
+  el.querySelectorAll('.song-list-item').forEach(item => {
+    addLongPress(item, () => {
+      const id = item.getAttribute('data-song-id');
+      openContextMenu(null, id, item);
+    });
+  });
 }
 
-// ===== GUEST BLOCK =====
+// ===== CONTEXT MENU =====
+let ctxSongId = null;
+let longPressTimer = null;
+
+function openContextMenu(e, songId, anchorEl) {
+  if (e) e.preventDefault();
+  ctxSongId = songId;
+  const song = allSongs.find(s => s._id === songId);
+  if (!song) return;
+
+  // Populate header
+  document.getElementById('ctxCover').src = song.coverUrl || '';
+  document.getElementById('ctxCover').style.display = song.coverUrl ? 'block' : 'none';
+  document.getElementById('ctxTitle').textContent = song.songName;
+  document.getElementById('ctxArtist').textContent = song.musicDirector || song.singer || '';
+  document.getElementById('ctxLikeText').textContent = isLiked(songId) ? 'Remove from Liked Songs' : 'Add to Liked Songs';
+  document.getElementById('ctxLikeBtn').style.color = isLiked(songId) ? 'var(--accent)' : '';
+
+  const menu = document.getElementById('songContextMenu');
+  const backdrop = document.getElementById('ctxBackdrop');
+  menu.classList.remove('hidden');
+  backdrop.classList.remove('hidden');
+
+  // Position menu
+  if (e) {
+    // Desktop right-click — position at cursor
+    const menuW = 240, menuH = 320;
+    let x = e.clientX, y = e.clientY;
+    if (x + menuW > window.innerWidth)  x = window.innerWidth - menuW - 8;
+    if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8;
+    menu.style.left = x + 'px';
+    menu.style.top  = y + 'px';
+    menu.style.bottom = 'auto';
+    menu.style.transform = 'none';
+  } else {
+    // Mobile long press — slide up from bottom
+    menu.style.left = '0';
+    menu.style.right = '0';
+    menu.style.bottom = '0';
+    menu.style.top = 'auto';
+    menu.style.transform = 'none';
+    menu.style.borderRadius = '20px 20px 0 0';
+    menu.style.width = '100%';
+    menu.style.maxWidth = '100%';
+  }
+}
+
+function closeContextMenu() {
+  document.getElementById('songContextMenu').classList.add('hidden');
+  document.getElementById('ctxBackdrop').classList.add('hidden');
+  ctxSongId = null;
+}
+
+function ctxPlay()         { if (ctxSongId) { playSong(ctxSongId); closeContextMenu(); } }
+function ctxPlayNext()     { if (ctxSongId) { playNext(ctxSongId); closeContextMenu(); } }
+function ctxAddToQueue()   { if (ctxSongId) { addToQueue(ctxSongId); closeContextMenu(); } }
+function ctxAddToPlaylist(){ if (ctxSongId) { openAddToPlaylist(ctxSongId); closeContextMenu(); } }
+function ctxToggleLike()   {
+  if (ctxSongId) {
+    toggleLike(ctxSongId);
+    document.getElementById('ctxLikeText').textContent = isLiked(ctxSongId) ? 'Remove from Liked Songs' : 'Add to Liked Songs';
+    document.getElementById('ctxLikeBtn').style.color = isLiked(ctxSongId) ? 'var(--accent)' : '';
+  }
+}
+function ctxViewCredits()  { if (ctxSongId) { openSongDetail(ctxSongId); closeContextMenu(); } }
+
+// Play Next — insert right after current song
+function playNext(id) {
+  if (requireLogin()) return;
+  const song = allSongs.find(s => s._id === id);
+  if (!song) return;
+  if (currentSongIndex === -1) { currentQueue = [song]; currentSongIndex = 0; loadAndPlay(); return; }
+  currentQueue.splice(currentSongIndex + 1, 0, song);
+  renderQueue();
+  showToast(`"${song.songName}" will play next!`);
+}
+
+// Long press helper for mobile
+function addLongPress(el, callback) {
+  let timer = null;
+  let moved = false;
+
+  el.addEventListener('touchstart', (e) => {
+    moved = false;
+    timer = setTimeout(() => {
+      if (!moved) {
+        callback();
+        // Vibrate if supported
+        if (navigator.vibrate) navigator.vibrate(40);
+      }
+    }, 500);
+  }, { passive: true });
+
+  el.addEventListener('touchmove', () => { moved = true; clearTimeout(timer); }, { passive: true });
+  el.addEventListener('touchend', () => clearTimeout(timer), { passive: true });
+  el.addEventListener('touchcancel', () => clearTimeout(timer), { passive: true });
+}
+
+// Close context menu on Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeContextMenu();
+});
 function requireLogin() {
   if (currentUser?.isGuest) { showLoginPrompt(); return true; }
   return false;
