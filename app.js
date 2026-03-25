@@ -77,6 +77,7 @@ let currentOpenPlaylistId = null;
 let isShuffle = false;
 let loopMode = 'none';
 let originalQueue = [];
+let currentSection = 'home';
 
 const audio = document.getElementById('audioPlayer');
 
@@ -196,6 +197,52 @@ async function startApp() {
     await loadPlaylists();
   }
   renderAllSongs();
+
+  // Push initial home state to history
+  history.replaceState({ section: 'home' }, '', '');
+
+  // Restore last played song
+  restoreLastPlayed();
+
+  // Handle browser back button
+  window.addEventListener('popstate', (e) => {
+    const section = e.state?.section || 'home';
+    // Close fullscreen player if open
+    const fs = document.getElementById('npFullscreen');
+    if (fs && !fs.classList.contains('hidden')) {
+      closeNowPlayingScreen();
+      history.pushState({ section: currentSection }, '', '');
+      return;
+    }
+    // If already on home, let browser exit normally
+    if (section === 'home') {
+      showSectionInternal('home');
+    } else {
+      showSectionInternal(section);
+    }
+  });
+}
+
+function restoreLastPlayed() {
+  try {
+    const saved = localStorage.getItem('melodiaLastPlayed');
+    if (!saved) return;
+    const { songId, time } = JSON.parse(saved);
+    const song = allSongs.find(s => s._id === songId);
+    if (!song) return;
+    currentQueue = [...allSongs];
+    currentSongIndex = currentQueue.findIndex(s => s._id === songId);
+    if (currentSongIndex === -1) return;
+    // Use global audio variable — do NOT redeclare with const
+    audio.src = song.audioUrl || '';
+    audio.currentTime = time || 0;
+    audio.pause();
+    isPlaying = false;
+    updateNowPlayingUI(song);
+    updateFsPlayPauseIcon();
+  } catch (e) {
+    console.log('Could not restore last played:', e.message);
+  }
 }
 
 function updateTopnavUser() {
@@ -428,13 +475,21 @@ function loadAndPlay() {
   audio.src = song.audioUrl || '';
   audio.loop = loopMode === 'single';
   audio.play().catch(() => {});
-  isPlaying = true; updateNowPlayingUI(song); renderQueue();
+  isPlaying = true;
+  updateNowPlayingUI(song);
+  renderQueue();
+  // Save last played to localStorage
+  try {
+    localStorage.setItem('melodiaLastPlayed', JSON.stringify({ songId: song._id, time: 0 }));
+  } catch(e) {}
 }
+
 function togglePlayPause() {
   if (requireLogin()) return;
   if (!currentQueue[currentSongIndex]) return;
-  if (isPlaying) { audio.pause(); isPlaying = false; document.getElementById('playPauseBtn').textContent = '▶'; }
-  else { audio.play(); isPlaying = true; document.getElementById('playPauseBtn').textContent = '⏸'; }
+  if (isPlaying) { audio.pause(); isPlaying = false; }
+  else           { audio.play();  isPlaying = true;  }
+  updateFsPlayPauseIcon();
 }
 function prevSong() { if (requireLogin()) return; if (currentSongIndex > 0) { currentSongIndex--; loadAndPlay(); } }
 function nextSong() {
@@ -455,8 +510,19 @@ audio.addEventListener('timeupdate', () => {
   updateFsProgress();
 });
 audio.addEventListener('ended', () => { if (loopMode === 'single') { audio.currentTime = 0; audio.play(); return; } nextSong(); });
-audio.addEventListener('play',  () => { isPlaying = true;  const b = document.getElementById('playPauseBtn'); if(b) b.textContent='⏸'; updateFsPlayPauseIcon(); });
-audio.addEventListener('pause', () => { isPlaying = false; const b = document.getElementById('playPauseBtn'); if(b) b.textContent='▶'; updateFsPlayPauseIcon(); });
+audio.addEventListener('play',  () => { isPlaying = true;  updateFsPlayPauseIcon(); });
+audio.addEventListener('pause', () => { isPlaying = false; updateFsPlayPauseIcon(); });
+audio.addEventListener('timeupdate', () => {
+  // Save current time every 5 seconds
+  if (Math.floor(audio.currentTime) % 5 === 0 && currentQueue[currentSongIndex]) {
+    try {
+      localStorage.setItem('melodiaLastPlayed', JSON.stringify({
+        songId: currentQueue[currentSongIndex]._id,
+        time: Math.floor(audio.currentTime)
+      }));
+    } catch(e) {}
+  }
+});
 
 function updateNowPlayingUI(song) {
   // Mini bar
@@ -517,16 +583,23 @@ function updateNowPlayingUI(song) {
   updateFsPlayPauseIcon();
   const fs = document.getElementById('npFullscreen');
   if (fs) fs.style.background = '#0a0a0f';
+
+  // Update desktop lyrics panel if open
+  const lyricsPanel = document.getElementById('lyricsPanel');
+  if (lyricsPanel && !lyricsPanel.classList.contains('hidden')) {
+    updateLyricsPanel();
+  }
 }
 
 // ===== FULLSCREEN NOW PLAYING =====
 function openNowPlayingScreen() {
   const song = currentQueue[currentSongIndex];
-  if (!song) return; // don't open if nothing playing
+  if (!song) return;
   const fs = document.getElementById('npFullscreen');
   fs.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   updateFsProgress();
+  history.pushState({ section: currentSection, fullscreen: true }, '', '');
 }
 
 function closeNowPlayingScreen() {
@@ -535,29 +608,32 @@ function closeNowPlayingScreen() {
 }
 
 function updateFsPlayPauseIcon() {
-  const playIcon  = document.getElementById('npfsPlayIcon');
-  const pauseIcon = document.getElementById('npfsPauseIcon');
-  const mobPlay   = document.getElementById('mobPlayIcon');
-  const mobPause  = document.getElementById('mobPauseIcon');
+  // Fullscreen
+  document.getElementById('npfsPlayIcon')?.classList.toggle('hidden', isPlaying);
+  document.getElementById('npfsPauseIcon')?.classList.toggle('hidden', !isPlaying);
+  // Mobile mini bar
+  document.getElementById('mobPlayIcon')?.classList.toggle('hidden', isPlaying);
+  document.getElementById('mobPauseIcon')?.classList.toggle('hidden', !isPlaying);
+  // Desktop bar
+  document.getElementById('desktopPlayIcon')?.classList.toggle('hidden', isPlaying);
+  document.getElementById('desktopPauseIcon')?.classList.toggle('hidden', !isPlaying);
 
-  if (isPlaying) {
-    playIcon?.classList.add('hidden');
-    pauseIcon?.classList.remove('hidden');
-    mobPlay?.classList.add('hidden');
-    mobPause?.classList.remove('hidden');
-  } else {
-    playIcon?.classList.remove('hidden');
-    pauseIcon?.classList.add('hidden');
-    mobPlay?.classList.remove('hidden');
-    mobPause?.classList.add('hidden');
-  }
   // Sync fullscreen shuffle/loop active states
-  const fsShuffleBtn = document.getElementById('npfsShuffleBtn');
-  const fsLoopBtn    = document.getElementById('npfsLoopBtn');
-  const fsLoopBadge  = document.getElementById('npfsLoopBadge');
-  if (fsShuffleBtn) fsShuffleBtn.classList.toggle('active', isShuffle);
-  if (fsLoopBtn)    fsLoopBtn.classList.toggle('active', loopMode !== 'none');
-  if (fsLoopBadge)  fsLoopBadge.classList.toggle('hidden', loopMode !== 'single');
+  const fsLoopBtn   = document.getElementById('npfsLoopBtn');
+  const fsLoopBadge = document.getElementById('npfsLoopBadge');
+  if (fsLoopBtn)   fsLoopBtn.classList.toggle('active', loopMode !== 'none');
+  if (fsLoopBadge) fsLoopBadge.classList.toggle('hidden', loopMode !== 'single');
+  // Desktop loop
+  const loopBtn   = document.getElementById('loopBtn');
+  const loopBadge = document.getElementById('loopBadge');
+  if (loopBtn)   loopBtn.classList.toggle('active', loopMode !== 'none');
+  if (loopBadge) loopBadge.classList.toggle('hidden', loopMode !== 'single');
+  // Desktop queue active
+  const qDesktop = document.getElementById('queueDesktopBtn');
+  if (qDesktop) {
+    const qPanel = document.getElementById('queuePanel');
+    qDesktop.classList.toggle('active', qPanel && !qPanel.classList.contains('hidden'));
+  }
 }
 
 function updateFsProgress() {
@@ -625,6 +701,45 @@ function addToQueue(id) {
   if (alreadyInQueue) { showToast(`"${song.songName}" is already in queue!`); return; }
   currentQueue.splice(currentSongIndex + 1, 0, song);
   renderQueue(); showToast(`"${song.songName}" added to queue!`);
+}
+
+// ===== DESKTOP LYRICS PANEL =====
+function toggleLyricsPanel() {
+  const panel = document.getElementById('lyricsPanel');
+  const btn   = document.getElementById('lyricsBtn');
+  const isOpen = !panel.classList.contains('hidden');
+  panel.classList.toggle('hidden');
+  btn?.classList.toggle('active', !isOpen);
+  // Close queue if lyrics opens (avoid overlap)
+  if (!isOpen) {
+    document.getElementById('queuePanel')?.classList.add('hidden');
+    document.getElementById('queueBtn')?.classList.remove('active');
+    updateLyricsPanel();
+  }
+}
+
+function updateLyricsPanel() {
+  const song = currentQueue[currentSongIndex];
+  const titleEl  = document.getElementById('lyricsPanelTitle');
+  const artistEl = document.getElementById('lyricsPanelArtist');
+  const textEl   = document.getElementById('lyricsPanelText');
+  const emptyEl  = document.getElementById('lyricsPanelEmpty');
+  if (!song) {
+    if (titleEl)  titleEl.textContent  = '—';
+    if (artistEl) artistEl.textContent = '—';
+    if (textEl)   textEl.textContent   = '';
+    if (emptyEl)  emptyEl.style.display = 'flex';
+    return;
+  }
+  if (titleEl)  titleEl.textContent  = song.songName;
+  if (artistEl) artistEl.textContent = song.musicDirector || song.singer || '—';
+  if (song.lyrics && song.lyrics.trim()) {
+    if (textEl)  { textEl.textContent = song.lyrics; textEl.style.display = 'block'; }
+    if (emptyEl) emptyEl.style.display = 'none';
+  } else {
+    if (textEl)  { textEl.textContent = ''; textEl.style.display = 'none'; }
+    if (emptyEl) emptyEl.style.display = 'flex';
+  }
 }
 
 // ===== QUEUE PANEL =====
@@ -878,6 +993,15 @@ function clearSearch() {
 
 // ===== SECTIONS =====
 function showSection(name) {
+  // Push to browser history (so back button works)
+  if (name !== currentSection) {
+    history.pushState({ section: name }, '', '');
+  }
+  showSectionInternal(name);
+}
+
+function showSectionInternal(name) {
+  currentSection = name;
   document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
   document.getElementById('searchResultsSection').classList.add('hidden');
   ['navLiked','navPlaylists','navAccount'].forEach(id => document.getElementById(id)?.classList.remove('active'));
@@ -890,7 +1014,12 @@ function showSection(name) {
   const mobMap = { home: 'mobHome', search: 'mobSearch', liked: 'mobLiked', playlists: 'mobPlaylists', account: 'mobAccount' };
   if (mobMap[name]) setMobActive(mobMap[name]);
   if (name === 'liked') renderLikedSection();
-  if (name === 'playlists') { renderPlaylistsSection(); document.getElementById('playlistDetail').classList.add('hidden'); document.getElementById('playlistsGrid').classList.remove('hidden'); currentOpenPlaylistId = null; }
+  if (name === 'playlists') {
+    renderPlaylistsSection();
+    document.getElementById('playlistDetail')?.classList.add('hidden');
+    document.getElementById('playlistsGrid')?.classList.remove('hidden');
+    currentOpenPlaylistId = null;
+  }
   if (name === 'account') renderAccountSection();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -1022,6 +1151,7 @@ function focusMobileSearch() {
     }, 100);
   }
 }
+
 function esc(str) {
   if (!str) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
