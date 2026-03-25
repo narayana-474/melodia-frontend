@@ -455,7 +455,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   position: fixed; inset: 0; z-index: 500;
   background: #0a0a0f;
   display: flex; flex-direction: column;
-  padding: 0; overflow: hidden;
+  padding: 0; overflow-y: auto;
   animation: npSlideUp 0.35s cubic-bezier(0.4,0,0.2,1);
 }
 @keyframes npSlideUp {
@@ -512,12 +512,28 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   padding: 0 28px 16px; gap: 12px; flex-shrink: 0;
 }
 .npfs-info { flex: 1; min-width: 0; overflow: hidden; }
+/* Global — disable text/image selection */
+*,*::before,*::after { -webkit-user-select:none; -moz-user-select:none; user-select:none; }
+/* Re-enable selection only for inputs and textareas */
+input, textarea, [contenteditable] { -webkit-user-select:text; -moz-user-select:text; user-select:text; }
+
 .npfs-title {
   font-family: var(--font-head); font-size: 22px; font-weight: 800;
-  color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  margin-bottom: 6px;
+  color: var(--text); overflow: hidden; white-space: nowrap;
+  margin-bottom: 6px; position: relative;
 }
-/* Marquee */
+/* Scroll animation for long song titles */
+.npfs-title-scroll {
+  animation: titleScroll 8s linear infinite;
+  animation-delay: 1.5s;
+}
+@keyframes titleScroll {
+  0%   { transform: translateX(0); }
+  40%  { transform: translateX(calc(-100% + 90%)); }
+  60%  { transform: translateX(calc(-100% + 90%)); }
+  100% { transform: translateX(0); }
+}
+
 .npfs-marquee-wrap { overflow: hidden; white-space: nowrap; width: 100%; }
 .npfs-marquee {
   display: inline-block;
@@ -528,6 +544,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 @keyframes marqueeScroll {
   0%   { transform: translateX(0); }
   100% { transform: translateX(-50%); }
+}
+
+/* Lyrics */
+.npfs-lyrics-wrap {
+  margin: 20px 0 0; padding: 0 28px 40px;
+  overflow-y: auto; flex-shrink: 0;
+}
+.npfs-lyrics-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+  color: var(--text-muted); margin-bottom: 14px; text-transform: uppercase;
+}
+.npfs-lyrics {
+  font-family: 'Poppins', sans-serif; font-weight: 400;
+  font-size: 15px; color: var(--text-dim);
+  line-height: 2; white-space: pre-wrap;
+  word-break: break-word;
 }
 .npfs-like-btn {
   background: none; border: none; font-size: 28px;
