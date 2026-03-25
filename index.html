@@ -240,12 +240,24 @@
   <!-- Center: controls + progress (desktop only) -->
   <div class="np-center">
     <div class="np-controls">
-      <button class="ctrl-btn mode-btn" id="shuffleBtn" onclick="toggleShuffle()" title="Shuffle">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17 4l4 4-4 4V9h-2.3c-.8 0-1.5.4-1.9 1L9.2 15c-.7 1-1.9 1.7-3.2 1.7H3v-2h3c.8 0 1.5-.4 1.9-1l3.6-5C12.2 7.6 13.4 7 14.7 7H17V4zm-10 1H3V3h4c1.3 0 2.5.6 3.2 1.7l.8 1.1-1.5 2-.7-1c-.4-.5-1.1-.8-1.8-.8zm9.7 9.3c.4.6 1.1 1 1.8 1H21v2h-2.5c-1.3 0-2.5-.6-3.2-1.7l-.8-1.1 1.5-2 .7 1z"/></svg>
+      <!-- Queue replaces Shuffle -->
+      <button class="ctrl-btn mode-btn" id="queueDesktopBtn" onclick="toggleQueue()" title="Queue">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h16v2H4zm2 5h12v2H6zm2 5h8v2H8z"/></svg>
       </button>
-      <button class="ctrl-btn" onclick="prevSong()">⏮</button>
-      <button class="ctrl-btn play-btn" id="playPauseBtn" onclick="togglePlayPause()">▶</button>
-      <button class="ctrl-btn" onclick="nextSong()">⏭</button>
+      <!-- Prev -->
+      <button class="ctrl-btn" onclick="prevSong()" title="Previous">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+      </button>
+      <!-- Play/Pause -->
+      <button class="ctrl-btn play-btn" id="playPauseBtn" onclick="togglePlayPause()">
+        <svg id="desktopPlayIcon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <svg id="desktopPauseIcon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="hidden"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+      </button>
+      <!-- Next -->
+      <button class="ctrl-btn" onclick="nextSong()" title="Next">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2-8.14L11.03 12 8 14.14V9.86zM16 6h2v12h-2z"/></svg>
+      </button>
+      <!-- Loop -->
       <button class="ctrl-btn mode-btn" id="loopBtn" onclick="cycleLoop()" title="Loop">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
         <span id="loopBadge" class="loop-badge hidden">1</span>
@@ -260,10 +272,10 @@
     </div>
   </div>
 
-  <!-- Desktop right: volume -->
+  <!-- Desktop right: lyrics + volume -->
   <div class="np-right">
-    <button class="ctrl-btn mode-btn" id="queueBtn" onclick="toggleQueue()" title="Queue">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/></svg>
+    <button class="ctrl-btn mode-btn" id="lyricsBtn" onclick="toggleLyricsPanel()" title="Lyrics">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
     </button>
     <div class="np-volume">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color:var(--text-dim);flex-shrink:0;"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
@@ -335,9 +347,7 @@
     </button>
     <!-- Prev -->
     <button class="npfs-ctrl-btn" onclick="prevSong()">
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-  <path d="M18 6l-8.5 6L18 18V6zm-2 8.14L12.97 12 16 9.86v4.28zM6 6h2v12H6z"/>
-</svg>
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
     </button>
     <!-- Play/Pause -->
     <button class="npfs-play-btn" id="npfsPlayPauseBtn" onclick="togglePlayPause()">
@@ -359,6 +369,25 @@
   <div class="npfs-lyrics-wrap" id="npfsLyricsWrap">
     <div class="npfs-lyrics-label">LYRICS</div>
     <div class="npfs-lyrics" id="npfsLyrics"></div>
+  </div>
+</div>
+
+<!-- DESKTOP LYRICS PANEL -->
+<div id="lyricsPanel" class="lyrics-panel hidden">
+  <div class="lyrics-panel-header">
+    <h3>Lyrics</h3>
+    <button class="queue-close-btn" onclick="toggleLyricsPanel()">✕</button>
+  </div>
+  <div class="lyrics-panel-song" id="lyricsPanelSong">
+    <div class="lyrics-panel-title" id="lyricsPanelTitle">—</div>
+    <div class="lyrics-panel-artist" id="lyricsPanelArtist">—</div>
+  </div>
+  <div class="lyrics-panel-body" id="lyricsPanelBody">
+    <div class="lyrics-panel-empty" id="lyricsPanelEmpty">
+      <span>🎵</span>
+      <p>No lyrics available for this song.</p>
+    </div>
+    <div class="lyrics-panel-text" id="lyricsPanelText"></div>
   </div>
 </div>
 
