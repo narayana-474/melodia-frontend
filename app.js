@@ -461,7 +461,6 @@ audio.addEventListener('pause', () => { isPlaying = false; const b = document.ge
 function updateNowPlayingUI(song) {
   // Mini bar
   document.getElementById('npTitle').textContent = song.songName;
-  // Show music director below song name in mini bar
   const musicDir = song.musicDirector || song.singer || '—';
   document.getElementById('npArtist').textContent = musicDir;
   const cover = document.getElementById('npCover');
@@ -473,7 +472,17 @@ function updateNowPlayingUI(song) {
   if (npLike) npLike.textContent = likeEmoji;
 
   // Fullscreen
-  document.getElementById('npfsTitle').textContent = song.songName;
+  // Song title — apply scroll animation if text is long
+  const titleEl = document.getElementById('npfsTitle');
+  titleEl.textContent = song.songName;
+  titleEl.classList.remove('npfs-title-scroll');
+  // Measure after render
+  requestAnimationFrame(() => {
+    if (titleEl.scrollWidth > titleEl.clientWidth + 4) {
+      titleEl.classList.add('npfs-title-scroll');
+    }
+  });
+
   const fsCover = document.getElementById('npfsCover');
   const fsCoverPh = document.getElementById('npfsCoverPh');
   if (song.coverUrl) {
@@ -485,7 +494,7 @@ function updateNowPlayingUI(song) {
     fsCoverPh.style.display = 'flex';
   }
 
-  // Marquee: Music Director + Singers with infinite scroll
+  // Marquee: Music Director + Singers
   const parts = [];
   if (song.musicDirector) parts.push(`🎼 ${song.musicDirector}`);
   if (song.singer)        parts.push(`🎤 ${song.singer}`);
@@ -494,6 +503,16 @@ function updateNowPlayingUI(song) {
   document.getElementById('npfsMarquee').textContent = doubled;
 
   document.getElementById('npfsLikeBtn').textContent = likeEmoji;
+
+  // Lyrics
+  const lyricsEl = document.getElementById('npfsLyrics');
+  const lyricsWrap = document.getElementById('npfsLyricsWrap');
+  if (song.lyrics && song.lyrics.trim()) {
+    lyricsEl.textContent = song.lyrics;
+    lyricsWrap.style.display = 'block';
+  } else {
+    lyricsWrap.style.display = 'none';
+  }
 
   updateFsPlayPauseIcon();
   const fs = document.getElementById('npFullscreen');
@@ -599,7 +618,11 @@ function addToQueue(id) {
   if (requireLogin()) return;
   const song = allSongs.find(s => s._id === id);
   if (!song) return;
+  // If nothing playing, start playing
   if (currentSongIndex === -1) { currentQueue = [song]; currentSongIndex = 0; loadAndPlay(); return; }
+  // Check if already in queue (upcoming songs only)
+  const alreadyInQueue = currentQueue.slice(currentSongIndex + 1).some(s => s._id === id);
+  if (alreadyInQueue) { showToast(`"${song.songName}" is already in queue!`); return; }
   currentQueue.splice(currentSongIndex + 1, 0, song);
   renderQueue(); showToast(`"${song.songName}" added to queue!`);
 }
@@ -883,8 +906,7 @@ function openSongDetail(id) {
     ['Movie / Album', song.movieName], ['Cast', song.cast],
     ['Singer', song.singer], ['Music Director', song.musicDirector],
     ['Lyricist', song.genre], ['Movie Director', song.movieDirector],
-    ['Label', song.label], ['Year', song.year],
-    ['Lyrics', song.lyrics ? song.lyrics.substring(0, 200) + (song.lyrics.length > 200 ? '…' : '') : null]
+    ['Label', song.label], ['Year', song.year]
   ];
   document.getElementById('sdTable').innerHTML = fields.filter(([,v]) => v).map(([k,v]) => `<tr><td>${k}</td><td>${esc(String(v))}</td></tr>`).join('');
   document.getElementById('songDetailModal').classList.remove('hidden');
@@ -1000,7 +1022,6 @@ function focusMobileSearch() {
     }, 100);
   }
 }
-
 function esc(str) {
   if (!str) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
