@@ -380,6 +380,7 @@ function renderSongsList(songs, containerId, showRemove = false, playlistId = nu
 // ===== CONTEXT MENU =====
 let ctxSongId = null;
 let longPressTimer = null;
+let pctxPlaylistId = null;
 
 function openContextMenu(e, songId, anchorEl) {
   if (e) e.preventDefault();
@@ -425,9 +426,11 @@ function openContextMenu(e, songId, anchorEl) {
 }
 
 function closeContextMenu() {
-  document.getElementById('songContextMenu').classList.add('hidden');
-  document.getElementById('ctxBackdrop').classList.add('hidden');
+  document.getElementById('songContextMenu')?.classList.add('hidden');
+  document.getElementById('playlistContextMenu')?.classList.add('hidden');
+  document.getElementById('ctxBackdrop')?.classList.add('hidden');
   ctxSongId = null;
+  pctxPlaylistId = null;
 }
 
 function ctxPlay()         { if (ctxSongId) { playSong(ctxSongId); closeContextMenu(); } }
@@ -634,19 +637,52 @@ function updateNowPlayingUI(song) {
 }
 
 // ===== FULLSCREEN NOW PLAYING =====
+function openQueueFromFullscreen() {
+  closeNowPlayingScreen();
+  setTimeout(() => { toggleQueue(); }, 320); // wait for close animation
+}
+
 function openNowPlayingScreen() {
   const song = currentQueue[currentSongIndex];
   if (!song) return;
   const fs = document.getElementById('npFullscreen');
   fs.classList.remove('hidden');
+  fs.classList.remove('npfs-closing');
   document.body.style.overflow = 'hidden';
   updateFsProgress();
   history.pushState({ section: currentSection, fullscreen: true }, '', '');
+
+  // Swipe down to close gesture
+  let startY = 0, isDragging = false;
+  fs._swipeHandler = (e) => { startY = e.touches[0].clientY; isDragging = true; };
+  fs._swipeMoveHandler = (e) => {
+    if (!isDragging) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy > 0) fs.style.transform = `translateY(${Math.min(dy, 200)}px)`;
+  };
+  fs._swipeEndHandler = (e) => {
+    isDragging = false;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (dy > 80) {
+      fs.style.transform = '';
+      closeNowPlayingScreen();
+    } else {
+      fs.style.transform = '';
+    }
+  };
+  fs.addEventListener('touchstart', fs._swipeHandler, { passive: true });
+  fs.addEventListener('touchmove', fs._swipeMoveHandler, { passive: true });
+  fs.addEventListener('touchend', fs._swipeEndHandler, { passive: true });
 }
 
 function closeNowPlayingScreen() {
   const fs = document.getElementById('npFullscreen');
+  fs.style.transform = '';
   fs.classList.add('npfs-closing');
+  // Remove swipe listeners
+  if (fs._swipeHandler)     fs.removeEventListener('touchstart', fs._swipeHandler);
+  if (fs._swipeMoveHandler) fs.removeEventListener('touchmove', fs._swipeMoveHandler);
+  if (fs._swipeEndHandler)  fs.removeEventListener('touchend', fs._swipeEndHandler);
   setTimeout(() => {
     fs.classList.add('hidden');
     fs.classList.remove('npfs-closing');
@@ -792,9 +828,13 @@ function updateLyricsPanel() {
 // ===== QUEUE PANEL =====
 function toggleQueue() {
   const panel = document.getElementById('queuePanel');
+  const isOpen = panel.classList.contains('hidden');
   panel.classList.toggle('hidden');
-  document.getElementById('queueBtn').classList.toggle('active', !panel.classList.contains('hidden'));
-  if (!panel.classList.contains('hidden')) renderQueue();
+  // Sync active state on both possible queue buttons
+  ['queueBtn','queueDesktopBtn'].forEach(id => {
+    document.getElementById(id)?.classList.toggle('active', isOpen);
+  });
+  if (isOpen) renderQueue();
 }
 function renderQueue() {
   const nowEl = document.getElementById('queueNowPlaying');
@@ -889,17 +929,27 @@ async function savePlaylists() {
 function renderPlaylistsSection() {
   const grid = document.getElementById('playlistsGrid');
   if (!grid) return;
-  if (!playlists.length) { grid.innerHTML = '<div style="color:var(--text-muted);font-size:14px;">No playlists yet. Create one!</div>'; return; }
+  if (!playlists.length) {
+    grid.innerHTML = '<div style="color:var(--text-muted);font-size:14px;">No playlists yet. Create one!</div>';
+    return;
+  }
   grid.innerHTML = playlists.map(p => `
-    <div class="playlist-card" onclick="openPlaylistDetail('${p.id}')">
+    <div class="playlist-card"
+      onclick="openPlaylistDetail('${p.id}')"
+      oncontextmenu="openPlaylistContextMenu(event,'${p.id}')"
+      data-playlist-id="${p.id}">
       <div class="playlist-card-art">📂</div>
-      <div class="playlist-card-menu">
-        <button class="card-action-btn" onclick="event.stopPropagation();openRenamePlaylistById('${p.id}')">✏️</button>
-        <button class="card-action-btn" onclick="event.stopPropagation();confirmDeletePlaylist('${p.id}')">🗑️</button>
-      </div>
       <div class="playlist-card-name">${esc(p.name)}</div>
       <div class="playlist-card-count">${p.songs.length} song${p.songs.length !== 1 ? 's' : ''}</div>
     </div>`).join('');
+
+  // Add long-press for mobile
+  grid.querySelectorAll('.playlist-card').forEach(card => {
+    addLongPress(card, () => {
+      const id = card.getAttribute('data-playlist-id');
+      openPlaylistContextMenu(null, id, card);
+    });
+  });
 }
 function openCreatePlaylist() {
   if (currentUser?.isGuest) return showToast('Please login to create playlists!');
@@ -932,9 +982,78 @@ async function saveRenamePlaylist() {
   showToast(`Renamed to "${newName}"`);
 }
 function confirmDeletePlaylist(id) {
-  const pl = playlists.find(p => p.id === id); if (!pl) return;
-  openConfirm('🗑️ Delete Playlist', `Delete "${pl.name}"? This cannot be undone.`,
-    async () => { playlists = playlists.filter(p => p.id !== id); await savePlaylists(); renderPlaylistsSection(); if (currentOpenPlaylistId === id) closePlaylistDetail(); showToast('Playlist deleted.'); });
+  const pl = playlists.find(p => p.id === id);
+  if (!pl) return;
+  openConfirm(
+    '🗑️ Delete Playlist',
+    `Delete "${pl.name}"? This cannot be undone.`,
+    async () => {
+      playlists = playlists.filter(p => p.id !== id);
+      await savePlaylists();
+      renderPlaylistsSection();
+      if (currentOpenPlaylistId === id) closePlaylistDetail();
+      showToast(`Playlist "${pl.name}" deleted.`);
+    }
+  );
+}
+
+// ===== PLAYLIST CONTEXT MENU =====
+function openPlaylistContextMenu(e, id, anchorEl) {
+  if (e) e.preventDefault();
+  pctxPlaylistId = id;
+  const pl = playlists.find(p => p.id === id);
+  if (!pl) return;
+
+  document.getElementById('pctxTitle').textContent = pl.name;
+  document.getElementById('pctxCount').textContent = `${pl.songs.length} song${pl.songs.length !== 1 ? 's' : ''}`;
+
+  const menu   = document.getElementById('playlistContextMenu');
+  const backdrop = document.getElementById('ctxBackdrop');
+  // Close song context menu if open
+  document.getElementById('songContextMenu')?.classList.add('hidden');
+  menu.classList.remove('hidden');
+  backdrop.classList.remove('hidden');
+
+  if (e) {
+    // Desktop right-click
+    const menuW = 240, menuH = 180;
+    let x = e.clientX, y = e.clientY;
+    if (x + menuW > window.innerWidth)  x = window.innerWidth - menuW - 8;
+    if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8;
+    menu.style.left = x + 'px';
+    menu.style.top  = y + 'px';
+    menu.style.bottom = 'auto';
+    menu.style.transform = 'none';
+    menu.style.borderRadius = '14px';
+    menu.style.width = '240px';
+  } else {
+    // Mobile long press — slide up from bottom
+    menu.style.left = '0';
+    menu.style.right = '0';
+    menu.style.bottom = '0';
+    menu.style.top = 'auto';
+    menu.style.width = '100%';
+    menu.style.maxWidth = '100%';
+    menu.style.borderRadius = '20px 20px 0 0';
+  }
+}
+
+function closePlaylistContextMenu() {
+  document.getElementById('playlistContextMenu')?.classList.add('hidden');
+  pctxPlaylistId = null;
+}
+
+function pctxRename() {
+  const id = pctxPlaylistId;
+  closePlaylistContextMenu();
+  closeContextMenu();
+  if (id) openRenamePlaylistById(id);
+}
+function pctxDelete() {
+  const id = pctxPlaylistId;
+  closePlaylistContextMenu();
+  closeContextMenu();
+  if (id) confirmDeletePlaylist(id);
 }
 function deleteCurrentPlaylist() { if (currentOpenPlaylistId) confirmDeletePlaylist(currentOpenPlaylistId); }
 function openPlaylistDetail(id) {
@@ -1161,10 +1280,22 @@ function openConfirm(title, msg, callback) {
   document.getElementById('confirmTitle').textContent = title;
   document.getElementById('confirmMsg').textContent = msg;
   confirmCallback = callback;
-  document.getElementById('confirmYesBtn').onclick = () => { closeConfirm(); if (confirmCallback) confirmCallback(); };
-  document.getElementById('confirmModal').classList.remove('hidden');
+  // Close any open context menus first
+  document.getElementById('songContextMenu')?.classList.add('hidden');
+  document.getElementById('playlistContextMenu')?.classList.add('hidden');
+  document.getElementById('ctxBackdrop')?.classList.add('hidden');
+  const modal = document.getElementById('confirmModal');
+  modal.classList.remove('hidden');
+  modal.style.zIndex = '10000'; // ensure above everything
+  document.getElementById('confirmYesBtn').onclick = () => {
+    closeConfirm();
+    if (confirmCallback) confirmCallback();
+  };
 }
-function closeConfirm() { document.getElementById('confirmModal').classList.add('hidden'); confirmCallback = null; }
+function closeConfirm() {
+  document.getElementById('confirmModal').classList.add('hidden');
+  confirmCallback = null;
+}
 
 // ===== SPACEBAR =====
 document.addEventListener('keydown', function(e) {
