@@ -342,7 +342,7 @@
   <!-- Controls: Queue | Prev | Play/Pause | Next | Loop -->
   <div class="npfs-controls">
     <!-- Queue (replaces Shuffle) -->
-    <button class="npfs-ctrl-btn mode" onclick="toggleQueue(); closeNowPlayingScreen();" title="Queue">
+    <button class="npfs-ctrl-btn mode" onclick="openQueueFromFullscreen()" title="Queue">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h16v2H4zm2 5h12v2H6zm2 5h8v2H8z"/></svg>
     </button>
     <!-- Prev -->
@@ -490,7 +490,27 @@
 </div>
 
 <!-- Context menu backdrop -->
-<div id="ctxBackdrop" class="ctx-backdrop hidden" onclick="closeContextMenu()"></div>
+<div id="ctxBackdrop" class="ctx-backdrop hidden" onclick="closeContextMenu(); closePlaylistContextMenu();"></div>
+
+<!-- PLAYLIST CONTEXT MENU -->
+<div id="playlistContextMenu" class="ctx-menu hidden">
+  <div class="ctx-song-info">
+    <div style="width:44px;height:44px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">📂</div>
+    <div class="ctx-meta">
+      <div class="ctx-title" id="pctxTitle"></div>
+      <div class="ctx-artist" id="pctxCount"></div>
+    </div>
+  </div>
+  <div class="ctx-divider"></div>
+  <button class="ctx-item" onclick="pctxRename()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+    Edit Playlist Name
+  </button>
+  <button class="ctx-item" onclick="pctxDelete()" style="color:#ff3f6c;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+    Delete Playlist
+  </button>
+</div>
 
 <div id="confirmModal" class="modal-overlay hidden">
   <div class="modal-box small">
