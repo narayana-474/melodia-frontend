@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Melodia — Admin Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin-body">
+
+<!-- Admin Login -->
+<div id="adminLoginOverlay" class="modal-overlay active">
+  <div class="modal-box">
+    <div class="admin-login-logo">
+      <div class="admin-login-icon">⚙️</div>
+      <div class="admin-login-brand">🎵 Melodia</div>
+      <div class="admin-login-subtitle">Admin Dashboard</div>
+    </div>
+    <div class="auth-form">
+      <input type="email" id="adminEmail" placeholder="Admin email" />
+      <input type="password" id="adminPassword" placeholder="Admin password" />
+      <label class="show-pwd-label">
+        <input type="checkbox" onchange="togglePwd('adminPassword', this)" />
+        Show password
+      </label>
+      <button class="btn-primary" onclick="adminLogin()">Login as Admin</button>
+      <p class="auth-note" id="adminLoginError"></p>
+    </div>
+  </div>
+</div>
+
+<!-- Admin App -->
+<div id="adminApp" class="hidden">
+  <aside class="admin-sidebar">
+    <div class="admin-brand">
+      <div class="admin-brand-icon">🎵</div>
+      <div class="admin-brand-text">
+        <div class="admin-brand-name">Melodia</div>
+        <div class="admin-brand-tag">Admin Panel</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav admin-nav">
+      <a class="nav-link active" onclick="adminSection('upload')" href="#">
+        <span class="nav-icon">📤</span> <span class="nav-label">Upload Song</span>
+      </a>
+      <a class="nav-link" onclick="adminSection('manage')" href="#">
+        <span class="nav-icon">🎵</span> <span class="nav-label">Manage Songs</span>
+      </a>
+      <a class="nav-link" onclick="adminSection('users')" href="#">
+        <span class="nav-icon">👥</span> <span class="nav-label">Manage Users</span>
+      </a>
+    </nav>
+    <div class="admin-sidebar-footer">
+      <a href="index.html" class="admin-footer-link">
+        <span>🌐</span> View User Site
+      </a>
+      <button class="admin-logout-btn" onclick="adminLogout()">
+        <span>🚪</span> Logout
+      </button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+
+    <!-- Upload Song -->
+    <section id="adminUpload" class="admin-section">
+      <div class="admin-page-header">
+        <div>
+          <h2 class="admin-title">Upload New Song</h2>
+          <p class="admin-subtitle">Add a new track to the Melodia library</p>
+        </div>
+      </div>
+      <div class="upload-card">
+        <div class="upload-grid">
+          <div class="form-group"><label>Song Name *</label><input type="text" id="uSongName" placeholder="e.g. Kesariya" /></div>
+          <div class="form-group"><label>Movie / Album Name *</label><input type="text" id="uMovieName" placeholder="e.g. Brahmastra" /></div>
+          <div class="form-group full-width"><label>Cast</label><input type="text" id="uCast" placeholder="e.g. Ranbir Kapoor, Alia Bhatt, Nagarjuna" /></div>
+          <div class="form-group"><label>Singer(s) *</label><input type="text" id="uSinger" placeholder="e.g. Arijit Singh" /></div>
+          <div class="form-group"><label>Music Director</label><input type="text" id="uMusicDirector" placeholder="e.g. Pritam" /></div>
+          <div class="form-group"><label>Movie Director</label><input type="text" id="uMovieDirector" placeholder="e.g. Ayan Mukerji" /></div>
+          <div class="form-group"><label>Label / Production</label><input type="text" id="uLabel" placeholder="e.g. Sony Music" /></div>
+          <div class="form-group full-width"><label>Lyrics</label><textarea id="uLyrics" placeholder="Paste song lyrics here..." rows="4"></textarea></div>
+          <div class="form-group"><label>Lyricist</label><input type="text" id="uGenre" placeholder="e.g. Amitabh Bhattacharya" /></div>
+          <div class="form-group"><label>Year</label><input type="number" id="uYear" placeholder="e.g. 2023" min="1900" max="2099" /></div>
+          <div class="form-group">
+            <label>Cover Image *</label>
+            <div class="file-drop-zone" onclick="document.getElementById('coverFile').click()">
+              <div id="coverPreview" class="file-preview-empty"><span>🖼️</span><p>Click or drop image here</p><small>JPG, PNG, WEBP — max 2MB</small></div>
+              <img id="coverPreviewImg" src="" alt="" class="hidden" />
+            </div>
+            <input type="file" id="coverFile" accept="image/*" class="hidden" onchange="previewCover(this)" />
+          </div>
+          <div class="form-group">
+            <label>Audio File *</label>
+            <div class="file-drop-zone" onclick="document.getElementById('audioFile').click()">
+              <div id="audioPreview" class="file-preview-empty"><span>🎵</span><p>Click or drop audio here</p><small>MP3, WAV, OGG — max 20MB</small></div>
+              <div id="audioFileName" class="audio-file-name hidden"></div>
+            </div>
+            <input type="file" id="audioFile" accept="audio/*" class="hidden" onchange="previewAudio(this)" />
+          </div>
+        </div>
+        <div class="upload-actions">
+          <button class="btn-primary large" onclick="uploadSong()">
+            <span id="uploadBtnText">📤 Upload Song</span>
+            <div id="uploadSpinner" class="spinner hidden"></div>
+          </button>
+          <button class="btn-ghost large" onclick="clearUploadForm()">Clear Form</button>
+        </div>
+        <div id="uploadStatus" class="upload-status"></div>
+      </div>
+    </section>
+
+    <!-- Manage Songs -->
+    <section id="adminManage" class="admin-section hidden">
+      <div class="admin-page-header">
+        <div>
+          <h2 class="admin-title">Manage Songs</h2>
+          <p class="admin-subtitle">Edit or remove songs from the library</p>
+        </div>
+        <input type="text" id="adminSearch" placeholder="🔍 Search songs..." oninput="adminSearchSongs(this.value)" class="admin-search" />
+      </div>
+      <div class="admin-songs-table-wrap">
+        <table class="admin-songs-table">
+          <thead><tr><th>Cover</th><th>Song Name</th><th>Movie</th><th>Singer</th><th>Lyricist</th><th>Year</th><th>Actions</th></tr></thead>
+          <tbody id="adminSongsTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Manage Users -->
+    <section id="adminUsers" class="admin-section hidden">
+      <div class="admin-page-header">
+        <div>
+          <h2 class="admin-title">Manage Users</h2>
+          <p class="admin-subtitle">View and manage registered Melodia users</p>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button class="admin-action-btn edit" onclick="loadAdminUsers()" style="padding:10px 16px;font-size:13px;">🔄 Refresh</button>
+          <input type="text" id="adminUserSearch" placeholder="🔍 Search users..." oninput="adminSearchUsers(this.value)" class="admin-search" />
+        </div>
+      </div>
+      <div class="admin-stats-row">
+        <div class="admin-stat-card"><div class="stat-icon">👥</div><div class="stat-num" id="statTotalUsers">0</div><div class="stat-label">Total Users</div></div>
+        <div class="admin-stat-card"><div class="stat-icon">🎵</div><div class="stat-num" id="statTotalSongs">0</div><div class="stat-label">Total Songs</div></div>
+        <div class="admin-stat-card"><div class="stat-icon">❤️</div><div class="stat-num" id="statTotalLikes">0</div><div class="stat-label">Total Likes</div></div>
+        <div class="admin-stat-card"><div class="stat-icon">📂</div><div class="stat-num" id="statTotalPlaylists">0</div><div class="stat-label">Total Playlists</div></div>
+      </div>
+      <div class="admin-songs-table-wrap">
+        <table class="admin-songs-table">
+          <thead><tr><th>User</th><th>Email</th><th>Joined</th><th>Liked Songs</th><th>Playlists</th><th>Actions</th></tr></thead>
+          <tbody id="adminUsersTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Edit Song Modal -->
+<div id="editSongModal" class="modal-overlay hidden">
+  <div class="modal-box large">
+    <button class="modal-close" onclick="closeEditModal()">✕</button>
+    <h3 style="font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:24px;">Edit Song</h3>
+    <input type="hidden" id="editSongId" />
+    <div class="upload-grid">
+      <div class="form-group"><label>Song Name</label><input type="text" id="editSongName" /></div>
+      <div class="form-group"><label>Movie Name</label><input type="text" id="editMovieName" /></div>
+      <div class="form-group full-width"><label>Cast</label><input type="text" id="editCast" placeholder="e.g. Ranbir Kapoor, Alia Bhatt" /></div>
+      <div class="form-group"><label>Singer</label><input type="text" id="editSinger" /></div>
+      <div class="form-group"><label>Music Director</label><input type="text" id="editMusicDirector" /></div>
+      <div class="form-group"><label>Movie Director</label><input type="text" id="editMovieDirector" /></div>
+      <div class="form-group"><label>Label</label><input type="text" id="editLabel" /></div>
+      <div class="form-group"><label>Lyricist</label><input type="text" id="editGenre" /></div>
+      <div class="form-group"><label>Year</label><input type="number" id="editYear" /></div>
+      <div class="form-group full-width"><label>Lyrics</label><textarea id="editLyrics" rows="3"></textarea></div>
+    </div>
+    <div style="display:flex;gap:12px;margin-top:20px;">
+      <button class="btn-primary" onclick="saveEditSong()">Save Changes</button>
+      <button class="btn-ghost" onclick="closeEditModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- User Detail Modal -->
+<div id="userDetailModal" class="modal-overlay hidden">
+  <div class="modal-box" style="max-width:500px;">
+    <button class="modal-close" onclick="closeUserDetail()">✕</button>
+    <div class="user-detail-header">
+      <div class="user-detail-avatar" id="udAvatar"></div>
+      <div>
+        <h3 id="udName" style="font-family:var(--font-head);font-size:20px;font-weight:800;"></h3>
+        <p id="udEmail" style="color:var(--text-dim);font-size:13px;margin-top:4px;"></p>
+        <p id="udJoined" style="color:var(--text-muted);font-size:12px;margin-top:2px;"></p>
+      </div>
+    </div>
+    <div class="user-detail-stats">
+      <div class="ud-stat"><span id="udLiked">0</span><small>Liked Songs</small></div>
+      <div class="ud-stat"><span id="udPlaylists">0</span><small>Playlists</small></div>
+    </div>
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+      <p style="color:var(--text-dim);font-size:13px;margin-bottom:12px;">Admin Actions</p>
+      <button class="btn-danger" style="width:100%;" onclick="adminDeleteUser(currentViewUserId)">🗑️ Delete This User Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div id="adminConfirmModal" class="modal-overlay hidden">
+  <div class="modal-box small">
+    <h3 id="adminConfirmTitle" style="font-family:var(--font-head);font-size:18px;font-weight:800;margin-bottom:12px;"></h3>
+    <p id="adminConfirmMsg" style="color:var(--text-dim);font-size:14px;margin-bottom:22px;line-height:1.6;"></p>
+    <div style="display:flex;gap:10px;">
+      <button class="btn-danger" id="adminConfirmYesBtn">Yes, proceed</button>
+      <button class="btn-ghost" onclick="closeAdminConfirm()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="admin.js"></script>
+</body>
+</html>
