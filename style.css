@@ -333,14 +333,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 @media(max-width:768px) { .lyrics-panel { display: none !important; } }
 
 /* QUEUE PANEL */
-.queue-panel{position:fixed;right:0;bottom:var(--bar-h);top:var(--topnav-h);width:320px;z-index:250;background:#111118;border-left:1px solid var(--border);display:flex;flex-direction:column;animation:slideInRight 0.25s ease;overflow:hidden;}
+.queue-panel{position:fixed;right:0;bottom:var(--bar-h);top:var(--topnav-h);width:320px;z-index:350;background:#111118;border-left:1px solid var(--border);display:flex;flex-direction:column;animation:slideInRight 0.25s ease;overflow:hidden;}
 @keyframes slideInRight{from{opacity:0;transform:translateX(20px);}to{opacity:1;transform:translateX(0);}}
 .queue-header{display:flex;align-items:center;justify-content:space-between;padding:20px 20px 14px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .queue-header h3{font-family:var(--font-head);font-size:18px;font-weight:800;}
 .queue-close-btn{background:none;border:none;color:var(--text-dim);font-size:16px;cursor:pointer;transition:color var(--transition);width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;}
 .queue-close-btn:hover{color:var(--text);background:var(--surface2);}
 .queue-now{padding:14px 16px 6px;flex-shrink:0;}
-.queue-next{padding:6px 16px 16px;flex:1;overflow-y:auto;}
+.queue-next{padding:6px 16px 100px;flex:1;overflow-y:auto;}
 .queue-section-label{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:8px;}
 .queue-item{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background var(--transition);}
 .queue-item:hover{background:var(--surface2);}
@@ -393,7 +393,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   .np-center{ display:none; }
   .song-detail-box{grid-template-columns:1fr;}
   .sd-cover{width:100%;height:auto;}
-  .queue-panel{width:100%;left:0;}
+  .queue-panel{
+    width:100%; left:0;
+    bottom:calc(var(--bar-h) + var(--mob-nav-h));
+    top: var(--topnav-h);
+    z-index: 350;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+  .queue-next{ padding-bottom: 24px; }
 
   /* ===== MOBILE BOTTOM NAV ===== */
   .mobile-bottom-nav{
@@ -421,7 +429,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   .mob-nav-btn .mob-icon{ font-size: 20px; line-height: 1; }
   .mob-nav-btn span:last-child{ font-size: 10px; font-weight: 500; }
   .mob-nav-btn.active{ color: var(--accent); }
-  .mob-nav-btn:hover{ color: var(--text); }
+  .mob-nav-btn:hover{ color: var(--text-muted); background: none; }
+  .mob-nav-btn.active:hover{ color: var(--accent); }
 
   /* Push now playing bar above bottom nav */
   .now-playing-bar{
@@ -504,10 +513,21 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   display: flex; flex-direction: column;
   padding: 0; overflow-y: auto;
   animation: npSlideUp 0.35s cubic-bezier(0.4,0,0.2,1);
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  will-change: transform;
+  transition: transform 0.05s linear;
 }
 @keyframes npSlideUp {
   from { transform: translateY(100%); opacity: 0.5; }
   to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes npSlideDown {
+  from { transform: translateY(0);    opacity: 1; }
+  to   { transform: translateY(100%); opacity: 0.5; }
+}
+.npfs-closing {
+  animation: npSlideDown 0.3s cubic-bezier(0.4,0,0.2,1) forwards !important;
 }
 
 /* Down arrow with animation */
@@ -567,18 +587,20 @@ input, textarea, [contenteditable] { -webkit-user-select:text; -moz-user-select:
 .npfs-title {
   font-family: var(--font-head); font-size: 22px; font-weight: 800;
   color: var(--text); overflow: hidden; white-space: nowrap;
-  margin-bottom: 6px; position: relative;
+  margin-bottom: 6px; position: relative; width: 100%;
 }
-/* Scroll animation for long song titles */
-.npfs-title-scroll {
-  animation: titleScroll 8s linear infinite;
-  animation-delay: 1.5s;
+/* Inner span for scroll — only applied when title is long */
+.npfs-title-inner {
+  display: inline-block;
 }
-@keyframes titleScroll {
+.npfs-title-scroll .npfs-title-inner {
+  animation: titleMarquee 10s linear infinite;
+  animation-delay: 1s;
+  padding-right: 48px;
+}
+@keyframes titleMarquee {
   0%   { transform: translateX(0); }
-  40%  { transform: translateX(calc(-100% + 90%)); }
-  60%  { transform: translateX(calc(-100% + 90%)); }
-  100% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 
 .npfs-marquee-wrap { overflow: hidden; white-space: nowrap; width: 100%; }
