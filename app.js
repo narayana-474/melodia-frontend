@@ -1,7 +1,7 @@
 // ===================================================================
 // MELODIA — USER PANEL JavaScript
 // ===================================================================
-const API_BASE_URL = 'https://melodia-backend-5f8g.onrender.com/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 
 // ── Wake Render server if sleeping (free tier sleeps after 15 min) ──
 async function wakeUpServer(statusElId, maxWaitMs = 28000) {
@@ -1412,19 +1412,39 @@ function stripSuffix(q) {
   return q.replace(/\s+(songs?|music|album|tracks?|hits?|all songs?)\s*$/i, '').trim();
 }
 
-// Check if a string contains the query (or vice versa) — flexible partial match
+// Normalize string — remove spaces and lowercase for space-insensitive matching
+function normalizeStr(s) {
+  return (s || '').toLowerCase().replace(/\s+/g, '');
+}
+
+// Check if a string contains the query (or vice versa) — flexible partial match, space-aware
 function fuzzyMatch(str, q) {
   if (!str || !q) return false;
   const s = str.toLowerCase(), t = q.toLowerCase();
-  return s.includes(t) || t.includes(s);
+  if (s.includes(t) || t.includes(s)) return true;
+  // Space-normalized match (e.g. "TheRajaSaab" matches "The Raja Saab")
+  const sn = normalizeStr(s), tn = normalizeStr(t);
+  return sn.includes(tn) || tn.includes(sn);
+}
+
+// Similarity score (0–1): how well the entity value covers the query
+// A score of 1.0 means exact match; prefer values that are close in length to the query
+function similarityScore(str, q) {
+  if (!str || !q) return 0;
+  const s = normalizeStr(str), t = normalizeStr(q);
+  if (!s || !t) return 0;
+  if (s === t) return 1;
+  if (s.includes(t)) return t.length / s.length;   // query fits inside entity
+  if (t.includes(s)) return s.length / t.length;   // entity fits inside query
+  return 0;
 }
 
 // Score: how many songs match this entity value for a given field
 function scoreEntity(songs, field, q) {
   const matched = songs.filter(s => {
     const val = (s[field] || '').toLowerCase();
-    // For multi-value fields like cast/singer, split by comma
-    if (field === 'cast' || field === 'singer') {
+    // For multi-value fields like cast/singer/song_category, split by comma
+    if (field === 'cast' || field === 'singer' || field === 'song_category') {
       return val.split(',').map(p => p.trim()).some(p => fuzzyMatch(p, q));
     }
     return fuzzyMatch(val, q);
@@ -1450,51 +1470,82 @@ function liveSearch(query) {
   // Broad match: find any song touching this query across all fields
   const broadResults = allSongs.filter(s => {
     const fields = [s.songName, s.movieName, s.singer, s.musicDirector,
-                    s.movieDirector, s.cast, s.label, s.genre];
+                    s.movieDirector, s.cast, s.label, s.genre,
+                    s.song_category, s.song_language];
     return fields.some(f => fuzzyMatch(f || '', coreQuery));
   });
 
   if (!broadResults.length) { showNoResults(raw); return; }
 
-  // ── Try to detect a single dominant entity ──────────────────────
-  // Score each field: which single value matches best?
+  // ── Best-match entity detection ──────────────────────────────────
+  // Evaluate ALL field types simultaneously and pick the entity with the
+  // HIGHEST similarity score to the query (more specific = higher score).
+  // This prevents a short category name like "Love" from beating a specific
+  // movie name like "Love Insurance Kompany" for the query "love insurance kompany".
   const checks = [
     { field: 'movieName',      label: 'Movie Album',     icon: '🎬' },
-    { field: 'musicDirector',  label: 'Music Director',  icon: '🎼' },
-    { field: 'singer',         label: 'Singer',          icon: '🎤' },
-    { field: 'genre',          label: 'Lyricist',        icon: '✍️' }, // genre = lyricist in schema
-    { field: 'cast',           label: 'Actor / Actress', icon: '🎭' },
-    { field: 'movieDirector',  label: 'Movie Director',  icon: '🎥' },
+    { field: 'singer',         label: 'Singer',          icon: '👤' },
+    { field: 'musicDirector',  label: 'Music Director',  icon: '👤' },
+    { field: 'cast',           label: 'Actor / Actress', icon: '👤' },
+    { field: 'movieDirector',  label: 'Movie Director',  icon: '👤' },
+    { field: 'genre',          label: 'Lyricist',        icon: '👤' },
+    { field: 'song_category',  label: 'Category',        icon: '🎵' },
+    { field: 'song_language',  label: 'Language',        icon: '🎵' },
   ];
 
+  let bestVal = null, bestScore = 0, bestField = null, bestLabel = null, bestIcon = null;
+
   for (const { field, label, icon } of checks) {
-    // Collect all unique values for this field among broad results
+    // Collect all unique individual values for this field among broad results
     const uniqueVals = new Set();
     broadResults.forEach(s => {
       const val = s[field] || '';
-      if (field === 'cast' || field === 'singer') {
+      if (field === 'cast' || field === 'singer' || field === 'song_category') {
         val.split(',').map(p => p.trim()).filter(Boolean).forEach(p => uniqueVals.add(p));
       } else {
         if (val) uniqueVals.add(val);
       }
     });
 
-    // Find the value that best matches the core query
-    let bestVal = null, bestCount = 0;
     for (const val of uniqueVals) {
-      if (!fuzzyMatch(val, coreQuery)) continue;
-      const { matched } = scoreEntity(allSongs, field, val);
-      if (matched.length > bestCount) { bestCount = matched.length; bestVal = val; }
-    }
-
-    if (bestVal && bestCount >= 1) {
-      // Get ALL songs in the library with this entity (not just broadResults)
-      const { matched: allMatched } = scoreEntity(allSongs, field, bestVal);
-      if (allMatched.length >= 1) {
-        // Show album/artist view for this entity
-        showEntityView(bestVal, allMatched, label, icon, field);
-        return;
+      const sim = similarityScore(val, coreQuery);
+      if (sim === 0) continue;
+      // Slight tie-break: among equal similarity scores, prefer longer (more specific) entity names
+      const tieScore = sim + (normalizeStr(val).length / 100000);
+      if (tieScore > bestScore) {
+        const { matched } = scoreEntity(allSongs, field, val);
+        if (matched.length >= 1) {
+          bestScore = tieScore;
+          bestVal   = val;
+          bestField = field;
+          bestLabel = label;
+          bestIcon  = icon;
+        }
       }
+    }
+  }
+
+  if (bestVal) {
+    // For person-type fields, expand results to ALL songs where the name appears
+    // in ANY person-related field (not just the detected field)
+    let allMatched;
+    if (['singer', 'cast', 'musicDirector', 'movieDirector', 'genre'].includes(bestField)) {
+      allMatched = allSongs.filter(s => {
+        const personFields = [
+          s.singer || '', s.cast || '', s.musicDirector || '',
+          s.movieDirector || '', s.genre || ''
+        ];
+        return personFields.some(f =>
+          f.split(',').map(p => p.trim()).some(p => fuzzyMatch(p, bestVal))
+        );
+      });
+    } else {
+      const result = scoreEntity(allSongs, bestField, bestVal);
+      allMatched = result.matched;
+    }
+    if (allMatched.length >= 1) {
+      showEntityView(bestVal, allMatched, bestLabel, bestIcon, bestField);
+      return;
     }
   }
 
@@ -1508,7 +1559,9 @@ function showEntityView(name, songs, label, icon, field) {
   document.getElementById('genericSearch').classList.add('hidden');
 
   document.getElementById('albumHeroType').textContent = label;
-  document.getElementById('albumHeroTitle').textContent = name;
+  // Append " Songs" to the title for all entity types except Movie Album
+  const displayName = field === 'movieName' ? name : name + ' Songs';
+  document.getElementById('albumHeroTitle').textContent = displayName;
 
   // Build subtitle
   const movies = [...new Set(songs.map(s => s.movieName).filter(Boolean))];
@@ -1518,7 +1571,7 @@ function showEntityView(name, songs, label, icon, field) {
     const dir = songs[0]?.movieDirector || '';
     if (md) sub += `  •  🎼 ${md}`;
     if (dir) sub += `  •  🎬 ${dir}`;
-  } else if (field !== 'singer' && field !== 'genre') {
+  } else {
     sub += `  •  ${movies.length} movie${movies.length !== 1 ? 's' : ''}`;
   }
   document.getElementById('albumHeroSub').textContent = sub;
@@ -1540,14 +1593,15 @@ function showEntityView(name, songs, label, icon, field) {
       img.classList.add('hidden'); ph.style.display = 'flex'; ph.textContent = '🎬';
     }
   } else {
-    // Non-movie: always show icon placeholder, no cover photos
+    // Non-movie: show appropriate placeholder icon
     if (collage) collage.remove();
     img.classList.add('hidden'); ph.style.display = 'flex';
-    ph.textContent = icon;
+    // Category and Language get music note icon; people get human icon
+    ph.textContent = (field === 'song_category' || field === 'song_language') ? '🎵' : '👤';
   }
 
-  // For cast/actor — group by movie
-  if (field === 'cast' || field === 'movieDirector') {
+  // For all person-type fields — group songs by movie
+  if (['cast', 'movieDirector', 'singer', 'musicDirector', 'genre'].includes(field)) {
     const listEl = document.getElementById('albumSongsList');
     listEl.innerHTML = '';
     const byMovie = {};
@@ -1626,23 +1680,23 @@ function showGroupedResults(raw, results) {
       </div>`).join(''), true));
   }
   if (multiMD.length) {
-    grouped.appendChild(makeGroupSection('🎼 Music Directors', multiMD.map(([name, songs]) =>
+    grouped.appendChild(makeGroupSection('👤 Music Directors', multiMD.map(([name, songs]) =>
       `<div class="entity-card" onclick="triggerAlbumSearch('${esc(name)}')">
-        <span class="entity-card-icon">🎼</span>
+        <span class="entity-card-icon">👤</span>
         <span>${esc(name)}</span><span style="color:var(--text-muted);font-size:12px;margin-left:auto;">${songs.length} songs</span>
       </div>`).join(''), true));
   }
   if (multiSinger.length) {
-    grouped.appendChild(makeGroupSection('🎤 Singers', multiSinger.map(([name, songs]) =>
+    grouped.appendChild(makeGroupSection('👤 Singers', multiSinger.map(([name, songs]) =>
       `<div class="entity-card" onclick="triggerAlbumSearch('${esc(name)}')">
-        <span class="entity-card-icon">🎤</span>
+        <span class="entity-card-icon">👤</span>
         <span>${esc(name)}</span><span style="color:var(--text-muted);font-size:12px;margin-left:auto;">${songs.length} songs</span>
       </div>`).join(''), true));
   }
   if (multiLyricist.length) {
-    grouped.appendChild(makeGroupSection('✍️ Lyricists', multiLyricist.map(([name, songs]) =>
+    grouped.appendChild(makeGroupSection('👤 Lyricists', multiLyricist.map(([name, songs]) =>
       `<div class="entity-card" onclick="triggerAlbumSearch('${esc(name)}')">
-        <span class="entity-card-icon">✍️</span>
+        <span class="entity-card-icon">👤</span>
         <span>${esc(name)}</span><span style="color:var(--text-muted);font-size:12px;margin-left:auto;">${songs.length} songs</span>
       </div>`).join(''), true));
   }
@@ -1656,7 +1710,10 @@ function showGroupedResults(raw, results) {
   results.forEach(song => {
     const tmp = document.createElement('div');
     tmp.innerHTML = renderSongsListItem(song);
-    songList.appendChild(tmp.firstChild);
+    const el = tmp.firstChild;
+    // Override onclick: open the song's movie album and highlight the clicked song
+    el.setAttribute('onclick', `openMovieAlbumForSong('${song._id}')`);
+    songList.appendChild(el);
   });
   songList._songsList = results;
   songGroup.appendChild(songList);

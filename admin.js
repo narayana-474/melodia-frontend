@@ -1,7 +1,7 @@
 // ===================================================================
 // MELODIA — ADMIN PANEL JavaScript
 // ===================================================================
-const API_BASE_URL = 'https://melodia-backend-5f8g.onrender.com/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 // ===================================================================
 
 let adminToken = null;
@@ -39,6 +39,20 @@ function adminErr(msg) {
   const el = document.getElementById('adminLoginError');
   el.textContent = msg;
   setTimeout(() => el.textContent = '', 5000);
+}
+
+// Auto-logout when token has expired
+function handleAuthError(status) {
+  if (status === 401 || status === 403) {
+    showAdminToast('⚠️ Session expired. Please log in again.');
+    setTimeout(() => {
+      adminToken = null;
+      localStorage.removeItem('rhythmAdminToken');
+      location.reload();
+    }, 1500);
+    return true;
+  }
+  return false;
 }
 
 function adminLogout() {
@@ -113,6 +127,8 @@ async function uploadSong() {
     formData.append('lyrics', document.getElementById('uLyrics').value.trim());
     formData.append('genre', document.getElementById('uGenre').value.trim());
     formData.append('year', document.getElementById('uYear').value);
+    formData.append('song_category', document.getElementById('uCategory').value.trim());
+    formData.append('song_language', document.getElementById('uLanguage').value.trim());
     if (coverFile) formData.append('cover', coverFile);
     if (audioFile) formData.append('audio', audioFile);
     const res = await fetch(`${API_BASE_URL}/songs`, {
@@ -136,6 +152,8 @@ async function uploadSong() {
       lyrics: document.getElementById('uLyrics').value.trim(),
       genre: document.getElementById('uGenre').value.trim(),
       year: document.getElementById('uYear').value,
+      song_category: document.getElementById('uCategory').value.trim(),
+      song_language: document.getElementById('uLanguage').value.trim(),
       coverUrl, audioUrl, createdAt: new Date().toISOString()
     };
     songs.push(newSong);
@@ -169,6 +187,8 @@ function clearUploadForm() {
   ['uSongName','uMovieName','uCast','uSinger','uMusicDirector','uMovieDirector','uLabel','uLyrics','uYear','uGenre'].forEach(id => {
     document.getElementById(id).value = '';
   });
+  document.getElementById('uCategory').value = '';
+  document.getElementById('uLanguage').value = '';
   document.getElementById('coverFile').value = '';
   document.getElementById('audioFile').value = '';
   document.getElementById('coverPreview').classList.remove('hidden');
@@ -178,7 +198,14 @@ function clearUploadForm() {
 }
 
 // ===== MANAGE SONGS =====
-function normalizeSong(s) { return { ...s, cast_members: s.cast_members || s.cast || '' }; }
+function normalizeSong(s) {
+  return {
+    ...s,
+    cast_members:  s.cast_members  || s.cast || '',
+    song_category: s.song_category || '',
+    song_language: s.song_language || '',
+  };
+}
 
 async function loadAdminSongs() {
   try {
@@ -232,6 +259,8 @@ function openEditModal(id) {
   document.getElementById('editLabel').value = song.label || '';
   document.getElementById('editGenre').value = song.genre || '';
   document.getElementById('editYear').value = song.year || '';
+  document.getElementById('editCategory').value = song.song_category || '';
+  document.getElementById('editLanguage').value = song.song_language || '';
   document.getElementById('editLyrics').value = song.lyrics || '';
   document.getElementById('editSongModal').classList.remove('hidden');
 }
@@ -242,31 +271,50 @@ async function saveEditSong() {
   const id = document.getElementById('editSongId').value;
   const castValue = document.getElementById('editCast').value.trim();
   const updated = {
-    songName: document.getElementById('editSongName').value.trim(),
-    movieName: document.getElementById('editMovieName').value.trim(),
-    cast_members: castValue, cast: castValue,
-    singer: document.getElementById('editSinger').value.trim(),
+    songName:      document.getElementById('editSongName').value.trim(),
+    movieName:     document.getElementById('editMovieName').value.trim(),
+    cast_members:  castValue, cast: castValue,
+    singer:        document.getElementById('editSinger').value.trim(),
     musicDirector: document.getElementById('editMusicDirector').value.trim(),
     movieDirector: document.getElementById('editMovieDirector').value.trim(),
-    label: document.getElementById('editLabel').value.trim(),
-    genre: document.getElementById('editGenre').value.trim(),
-    year: document.getElementById('editYear').value,
-    lyrics: document.getElementById('editLyrics').value.trim(),
+    label:         document.getElementById('editLabel').value.trim(),
+    genre:         document.getElementById('editGenre').value.trim(),
+    year:          document.getElementById('editYear').value,
+    song_category: document.getElementById('editCategory').value.trim(),
+    song_language: document.getElementById('editLanguage').value.trim(),
+    lyrics:        document.getElementById('editLyrics').value.trim(),
   };
   try {
     const res = await fetch(`${API_BASE_URL}/songs/${id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
       body: JSON.stringify(updated)
     });
-    if (!res.ok) throw new Error();
+    const data = await res.json();
+    if (!res.ok) {
+      // Auto-logout on expired token (401)
+      if (handleAuthError(res.status)) { closeEditModal(); return; }
+      showAdminToast(`❌ Error: ${data.message || 'Update failed. Check Supabase columns exist.'}`);
+      console.error('saveEditSong API error:', data.message);
+      closeEditModal();
+      return;
+    }
     showAdminToast('✅ Song updated successfully!');
-  } catch {
+    closeEditModal();
+    loadAdminSongs();
+  } catch (e) {
+    // Network error — server unreachable, use localStorage fallback
+    console.warn('saveEditSong network error, using localStorage:', e.message);
     const songs = JSON.parse(localStorage.getItem('rhythmSongs') || '[]');
     const idx = songs.findIndex(s => s._id === id);
-    if (idx !== -1) { songs[idx] = { ...songs[idx], ...updated }; localStorage.setItem('rhythmSongs', JSON.stringify(songs)); }
-    showAdminToast('✅ Song updated (demo mode)!');
+    if (idx !== -1) {
+      songs[idx] = { ...songs[idx], ...updated };
+      localStorage.setItem('rhythmSongs', JSON.stringify(songs));
+    }
+    showAdminToast('⚠️ Server unreachable — saved locally (demo mode).');
+    closeEditModal();
+    loadAdminSongs();
   }
-  closeEditModal(); loadAdminSongs();
 }
 
 async function deleteSong(id) {
