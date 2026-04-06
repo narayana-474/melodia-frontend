@@ -1,7 +1,7 @@
 // ===================================================================
 // MELODIA — USER PANEL JavaScript
 // ===================================================================
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://melodia-backend-5f8g.onrender.com';
 
 // ── Wake Render server if sleeping (free tier sleeps after 15 min) ──
 async function wakeUpServer(statusElId, maxWaitMs = 28000) {
