@@ -1,7 +1,15 @@
 // ===================================================================
 // MELODIA — USER PANEL JavaScript
 // ===================================================================
-const API_BASE_URL = 'https://melodia-backend-5f8g.onrender.com';
+// ── Auto-detect backend URL ──────────────────────────────────────────
+// • On localhost → use local Node server
+// • On any deployed domain → use your Render/Railway/etc. backend URL
+//   👇 Replace this with your actual deployed backend URL
+const DEPLOYED_BACKEND_URL = 'https://melodia-backend-5f8g.onrender.com/api';
+
+const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:5000/api'
+  : DEPLOYED_BACKEND_URL;
 
 // ── Wake Render server if sleeping (free tier sleeps after 15 min) ──
 async function wakeUpServer(statusElId, maxWaitMs = 28000) {
