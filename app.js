@@ -7,8 +7,8 @@
 //   👇 Replace this with your actual deployed backend URL
 const DEPLOYED_BACKEND_URL = 'https://melodia-backend-5f8g.onrender.com/api';
 
-const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? 'http://localhost:5000/api'
+const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.0')
+  ? 'http://localhost:5003/api'
   : DEPLOYED_BACKEND_URL;
 
 // ── Wake Render server if sleeping (free tier sleeps after 15 min) ──
@@ -479,7 +479,7 @@ function renderSongsList(songs, containerId, showRemove = false, playlistId = nu
       ${song.coverUrl ? `<img class="song-list-cover" src="${song.coverUrl}" alt="" onerror="this.outerHTML='<div class=song-list-cover-ph>🎵</div>'" />` : `<div class="song-list-cover-ph">🎵</div>`}
       <div class="song-list-meta">
         <div class="song-list-title">${esc(song.songName)}</div>
-        <div class="song-list-artist">${esc(song.musicDirector || song.singer)} • ${esc(song.movieName)}</div>
+        <div class="song-list-artist">${esc(buildCreditsText(song))} • ${esc(song.movieName)}</div>
       </div>
       ${showRemove ? `<button class="card-action-btn" title="Remove" onclick="event.stopPropagation();removeSongFromPlaylist('${playlistId}','${song._id}')">🗑️</button>` : ''}
     </div>`
@@ -748,7 +748,46 @@ audio.addEventListener('timeupdate', () => {
   }
 });
 
+// ===== CREDITS TEXT BUILDER =====
+// Splits comma-separated fields, deduplicates across all three fields,
+// and returns a single comma-separated string in order:
+//   Music Director, Singer 1, Singer 2, ..., Lyricist 1, Lyricist 2, ...
+// NOTE: lyricist is stored in song.genre field in this app.
+function buildCreditsText(song) {
+  const splitField = (val) =>
+    (val || '').split(',').map(s => s.trim()).filter(Boolean);
+
+  const directors = splitField(song.musicDirector);
+  const singers   = splitField(song.singer);
+  const lyricists = splitField(song.genre); // genre field stores lyricist name
+
+  const seen = new Set();
+  const result = [];
+
+  const addUnique = (name) => {
+    const key = name.toLowerCase();
+    if (!seen.has(key)) { seen.add(key); result.push(name); }
+  };
+
+  directors.forEach(addUnique);
+  singers.forEach(addUnique);
+  lyricists.forEach(addUnique);
+
+  return result.length ? result.join(', ') : '—';
+}
+
+// Returns count of unique credit names across all three fields
+function buildCreditsCount(song) {
+  const splitField = (val) =>
+    (val || '').split(',').map(s => s.trim()).filter(Boolean);
+  const seen = new Set();
+  [...splitField(song.musicDirector), ...splitField(song.singer), ...splitField(song.genre)]
+    .forEach(n => seen.add(n.toLowerCase()));
+  return seen.size;
+}
+
 function updateNowPlayingUI(song) {
+
   // ===== MEDIA SESSION API — lock screen / earphone controls =====
   if ('mediaSession' in navigator) {
     // Build artwork array from cover URL
@@ -789,8 +828,21 @@ function updateNowPlayingUI(song) {
       npTitleEl.classList.add('np-title-scroll');
     }
   }, 100);
-  const musicDir = song.musicDirector || song.singer || '—';
-  document.getElementById('npArtist').textContent = musicDir;
+  // Build scroll text: Music Director, unique Singers, unique Lyricists (no duplicates)
+  const npArtistText = buildCreditsText(song);
+  const npArtistEl = document.getElementById('npArtist');
+  npArtistEl.classList.remove('np-artist-scroll');
+  // Render plain first, then measure — scroll only if text overflows the container
+  npArtistEl.innerHTML = `<span class="np-artist-inner">${esc(npArtistText)}</span>`;
+  setTimeout(() => {
+    const inner = npArtistEl.querySelector('.np-artist-inner');
+    if (inner && inner.scrollWidth > npArtistEl.clientWidth + 2) {
+      const sep = '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0';
+      const doubled = npArtistText + sep + npArtistText;
+      inner.textContent = doubled;
+      npArtistEl.classList.add('np-artist-scroll');
+    }
+  }, 100);
   const cover = document.getElementById('npCover');
   cover.src = song.coverUrl || ''; cover.style.display = song.coverUrl ? 'block' : 'none';
 
@@ -798,6 +850,9 @@ function updateNowPlayingUI(song) {
   const likeEmoji = isLiked(song._id) ? '❤️' : '🤍';
   const npLike = document.getElementById('npLikeBtn');
   if (npLike) npLike.textContent = likeEmoji;
+  // Desktop like button
+  const npDesktopLike = document.getElementById('npDesktopLikeBtn');
+  if (npDesktopLike) npDesktopLike.classList.toggle('liked', isLiked(song._id));
 
   // Fullscreen
   // Song title — apply scroll animation if text is long
@@ -825,13 +880,24 @@ function updateNowPlayingUI(song) {
     fsCoverPh.style.display = 'flex';
   }
 
-  // Marquee: Music Director + Singers
-  const parts = [];
-  if (song.musicDirector) parts.push(`🎼 ${song.musicDirector}`);
-  if (song.singer)        parts.push(`🎤 ${song.singer}`);
-  const marqueeText = parts.length ? parts.join('   •   ') : '—';
-  const doubled = `${marqueeText}          ${marqueeText}`;
-  document.getElementById('npfsMarquee').textContent = doubled;
+  // Marquee: Music Director, unique Singers, unique Lyricists (no duplicates)
+  // Only scroll if the text is longer than the container; otherwise display statically once.
+  const marqueeText = buildCreditsText(song);
+  const marqueeEl = document.getElementById('npfsMarquee');
+  const marqueeWrap = marqueeEl.parentElement;
+  marqueeEl.classList.remove('npfs-marquee-static');
+  marqueeEl.textContent = marqueeText; // render plain first to measure
+  setTimeout(() => {
+    if (marqueeEl.scrollWidth > marqueeWrap.clientWidth + 2) {
+      // Text overflows — enable scrolling with doubled content and wide gap
+      const sep = '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0';
+      marqueeEl.textContent = `${marqueeText}${sep}${marqueeText}`;
+      marqueeEl.classList.remove('npfs-marquee-static');
+    } else {
+      // Text fits — display once, no animation
+      marqueeEl.classList.add('npfs-marquee-static');
+    }
+  }, 100);
 
   document.getElementById('npfsLikeBtn').textContent = likeEmoji;
 
@@ -877,6 +943,8 @@ function openNowPlayingScreen() {
   setTimeout(() => {
     const song = currentQueue[currentSongIndex];
     if (!song) return;
+
+    // --- Title ---
     const titleEl = document.getElementById('npfsTitle');
     // Reset and re-render cleanly (element was hidden before, so scrollWidth was 0)
     titleEl.classList.remove('npfs-title-scroll');
@@ -887,6 +955,23 @@ function openNowPlayingScreen() {
       if (inner && inner.scrollWidth > titleEl.clientWidth + 2) {
         inner.textContent = song.songName + '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0' + song.songName;
         titleEl.classList.add('npfs-title-scroll');
+      }
+    });
+
+    // --- Marquee (artist credits) ---
+    const marqueeEl  = document.getElementById('npfsMarquee');
+    const marqueeWrap = marqueeEl.parentElement;
+    const marqueeText = buildCreditsText(song);
+    // Reset to plain text first so scrollWidth is accurate
+    marqueeEl.classList.remove('npfs-marquee-static');
+    marqueeEl.textContent = marqueeText;
+    requestAnimationFrame(() => {
+      if (marqueeEl.scrollWidth > marqueeWrap.clientWidth + 2) {
+        const sep = '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0';
+        marqueeEl.textContent = `${marqueeText}${sep}${marqueeText}`;
+        marqueeEl.classList.remove('npfs-marquee-static');
+      } else {
+        marqueeEl.classList.add('npfs-marquee-static');
       }
     });
   }, 80);
@@ -1030,7 +1115,7 @@ function updateLyricsPanel() {
     return;
   }
   if (titleEl)  titleEl.textContent  = song.songName;
-  if (artistEl) artistEl.textContent = song.musicDirector || song.singer || '—';
+  if (artistEl) artistEl.textContent = buildCreditsText(song);
   if (song.lyrics && song.lyrics.trim()) {
     if (textEl)  { textEl.textContent = song.lyrics; textEl.style.display = 'block'; }
     if (emptyEl) emptyEl.style.display = 'none';
@@ -1173,6 +1258,9 @@ async function toggleLike(id) {
   // Sync fullscreen like button
   const fsLike = document.getElementById('npfsLikeBtn');
   if (fsLike && currentQueue[currentSongIndex]?._id === id) fsLike.textContent = emoji;
+  // Sync desktop like button
+  const desktopLike = document.getElementById('npDesktopLikeBtn');
+  if (desktopLike && currentQueue[currentSongIndex]?._id === id) desktopLike.classList.toggle('liked', liked);
   renderLikedSection();
 }
 function toggleLikeCurrent() { const s = currentQueue[currentSongIndex]; if (s) toggleLike(s._id); }
@@ -2163,7 +2251,7 @@ async function renderDownloadsSection() {
       ${coverUrl ? `<img class="song-list-cover" src="${coverUrl}" alt="" />` : `<div class="song-list-cover-ph">🎵</div>`}
       <div class="song-list-meta">
         <div class="song-list-title">${esc(m.songName)}</div>
-        <div class="song-list-artist">${esc(m.musicDirector || m.singer || '—')} • ${esc(m.movieName || '')}</div>
+        <div class="song-list-artist">${esc(buildCreditsText(m))} • ${esc(m.movieName || '')}</div>
       </div>
       <button class="card-action-btn" title="Remove" onclick="event.stopPropagation();removeDownloadedSong('${d.id}')">🗑️</button>
     </div>`;
