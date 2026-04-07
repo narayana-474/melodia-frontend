@@ -428,7 +428,7 @@ function renderSongsGrid(songs, containerId) {
       </div>
       <div class="song-card-info">
         <div class="song-card-title">${esc(song.songName)}</div>
-        <div class="song-card-artist">${esc(song.musicDirector || song.singer)}</div>
+        <div class="song-card-artist">${esc(buildCreditsText(song))}</div>
       </div>
     </div>`
   ).join('');
@@ -509,7 +509,7 @@ function openContextMenu(e, songId, anchorEl) {
   document.getElementById('ctxCover').src = song.coverUrl || '';
   document.getElementById('ctxCover').style.display = song.coverUrl ? 'block' : 'none';
   document.getElementById('ctxTitle').textContent = song.songName;
-  document.getElementById('ctxArtist').textContent = song.musicDirector || song.singer || '';
+  document.getElementById('ctxArtist').textContent = buildCreditsText(song);
   document.getElementById('ctxLikeText').textContent = isLiked(songId) ? 'Remove from Liked Songs' : 'Add to Liked Songs';
   document.getElementById('ctxLikeBtn').style.color = isLiked(songId) ? 'var(--accent)' : '';
   // Update download button state
@@ -797,7 +797,7 @@ function updateNowPlayingUI(song) {
 
     navigator.mediaSession.metadata = new MediaMetadata({
       title:  song.songName  || 'Unknown Song',
-      artist: song.singer    || song.musicDirector || '—',
+      artist: buildCreditsText(song),
       album:  song.movieName || '',
       artwork,
     });
@@ -881,22 +881,24 @@ function updateNowPlayingUI(song) {
   }
 
   // Marquee: Music Director, unique Singers, unique Lyricists (no duplicates)
-  // Only scroll if the text is longer than the container; otherwise display statically once.
+  // Only scroll if the text is longer than the container; otherwise display statically.
   const marqueeText = buildCreditsText(song);
   const marqueeEl = document.getElementById('npfsMarquee');
   const marqueeWrap = marqueeEl.parentElement;
-  marqueeEl.classList.remove('npfs-marquee-static');
+  marqueeWrap.classList.remove('npfs-marquee-scroll');
   marqueeEl.textContent = marqueeText; // render plain first to measure
   setTimeout(() => {
     if (marqueeEl.scrollWidth > marqueeWrap.clientWidth + 2) {
       // Text overflows — enable scrolling with doubled content and wide gap
       const sep = '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0';
       marqueeEl.textContent = `${marqueeText}${sep}${marqueeText}`;
-      marqueeEl.classList.remove('npfs-marquee-static');
-    } else {
-      // Text fits — display once, no animation
-      marqueeEl.classList.add('npfs-marquee-static');
+      marqueeWrap.classList.add('npfs-marquee-scroll');
+      // Restart animation from the beginning
+      marqueeEl.style.animation = 'none';
+      void marqueeEl.offsetWidth;
+      marqueeEl.style.animation = '';
     }
+    // else: no class = no animation, text shows statically
   }, 100);
 
   document.getElementById('npfsLikeBtn').textContent = likeEmoji;
@@ -963,16 +965,19 @@ function openNowPlayingScreen() {
     const marqueeWrap = marqueeEl.parentElement;
     const marqueeText = buildCreditsText(song);
     // Reset to plain text first so scrollWidth is accurate
-    marqueeEl.classList.remove('npfs-marquee-static');
+    marqueeWrap.classList.remove('npfs-marquee-scroll');
     marqueeEl.textContent = marqueeText;
     requestAnimationFrame(() => {
       if (marqueeEl.scrollWidth > marqueeWrap.clientWidth + 2) {
         const sep = '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0';
         marqueeEl.textContent = `${marqueeText}${sep}${marqueeText}`;
-        marqueeEl.classList.remove('npfs-marquee-static');
-      } else {
-        marqueeEl.classList.add('npfs-marquee-static');
+        marqueeWrap.classList.add('npfs-marquee-scroll');
+        // Restart animation from the beginning
+        marqueeEl.style.animation = 'none';
+        void marqueeEl.offsetWidth;
+        marqueeEl.style.animation = '';
       }
+      // else: no class = no animation, text shows statically
     });
   }, 80);
 }
@@ -1211,7 +1216,7 @@ function queueItemHTML(song, idx, isNow) {
     ${song.coverUrl ? `<img class="queue-cover" src="${song.coverUrl}" alt="" />` : `<div class="queue-cover-ph">🎵</div>`}
     <div class="queue-meta">
       <div class="queue-title">${esc(song.songName)}</div>
-      <div class="queue-artist">${esc(song.singer || '')}</div>
+      <div class="queue-artist">${esc(buildCreditsText(song))}</div>
     </div>
     ${isNow
       ? '<span style="color:var(--accent);font-size:11px;flex-shrink:0;">▶ Now</span>'
@@ -1728,7 +1733,7 @@ function renderSongsListItem(song) {
     ${song.coverUrl ? `<img class="song-list-cover" src="${song.coverUrl}" alt="" onerror="this.outerHTML='<div class=song-list-cover-ph>🎵</div>'" />` : `<div class="song-list-cover-ph">🎵</div>`}
     <div class="song-list-meta">
       <div class="song-list-title">${esc(song.songName)}</div>
-      <div class="song-list-artist">${esc(song.musicDirector || song.singer)} • ${esc(song.movieName)}</div>
+      <div class="song-list-artist">${esc(buildCreditsText(song))} • ${esc(song.movieName)}</div>
     </div>
   </div>`;
 }
