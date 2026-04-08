@@ -1,12 +1,20 @@
 // ===================================================================
 // MELODIA — USER PANEL JavaScript
 // ===================================================================
-const API_BASE_URL = 'https://melodia-backend-5f8g.onrender.com/api';
+// ── Auto-detect backend URL ──────────────────────────────────────────
+// • On localhost → use local Node server
+// • On any deployed domain → use your Render/Railway/etc. backend URL
+//   👇 Replace this with your actual deployed backend URL
+const DEPLOYED_BACKEND_URL = 'https://melodia-backend-5f8g.onrender.com/api';
+
+const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '')
+  ? 'http://localhost:5000/api'
+  : DEPLOYED_BACKEND_URL;
 
 // ── Wake Render server if sleeping (free tier sleeps after 15 min) ──
 async function wakeUpServer(statusElId, maxWaitMs = 28000) {
-  const el    = statusElId ? document.getElementById(statusElId) : null;
-  const ping  = async () => {
+  const el = statusElId ? document.getElementById(statusElId) : null;
+  const ping = async () => {
     try { const r = await fetch(`${API_BASE_URL}/songs`, { cache: 'no-store' }); return r.ok; }
     catch { return false; }
   };
@@ -35,7 +43,7 @@ const firebaseConfig = {
 
 let firebaseApp, firebaseAuth;
 try {
-  firebaseApp  = firebase.initializeApp(firebaseConfig);
+  firebaseApp = firebase.initializeApp(firebaseConfig);
   firebaseAuth = firebase.auth();
 } catch (e) { console.warn('Firebase not configured:', e.message); }
 
@@ -55,9 +63,9 @@ async function signInWithGoogle() {
 
 async function handleSocialAuthResult(result) {
   const fu = result.user;
-  const name  = fu.displayName || fu.email?.split('@')[0] || 'User';
+  const name = fu.displayName || fu.email?.split('@')[0] || 'User';
   const email = fu.email;
-  const uid   = fu.uid;
+  const uid = fu.uid;
   if (!email) { showAuthError('loginError', 'Could not get email. Please use email login.'); return; }
   try {
     const res = await fetch(`${API_BASE_URL}/auth/social-login`, {
@@ -95,7 +103,7 @@ let currentDetailSongId = null;
 let addToPlaylistSongId = null;
 let currentOpenPlaylistId = null;
 let isShuffle = false;
-let loopMode = 'none';
+let loopMode = 'playlist';
 let originalQueue = [];
 let currentSection = 'home';
 
@@ -154,9 +162,12 @@ function switchAuthTab(tab) {
 }
 
 async function loginUser() {
-  const email = document.getElementById('loginEmail').value.trim();
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
   const password = document.getElementById('loginPassword').value;
   if (!email || !password) return showAuthError('loginError', 'Please fill all fields.');
+
+  // Show connecting message in case server is waking up (Render free tier)
+  showAuthError('loginError', '⏳ Connecting to server…');
   try {
     const res = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -164,38 +175,35 @@ async function loginUser() {
     });
     const data = await res.json();
     if (!res.ok) return showAuthError('loginError', data.message || 'Login failed.');
+    showAuthError('loginError', ''); // clear the connecting message
     currentUser = data.user;
     localStorage.setItem('rhythmUser', JSON.stringify(currentUser));
     localStorage.setItem('rhythmToken', data.token);
     startApp();
   } catch {
-    const users = JSON.parse(localStorage.getItem('rhythmUsers') || '[]');
-    const user = users.find(u => u.email === email && u.password === password);
-    if (!user) return showAuthError('loginError', 'Invalid credentials.');
-    currentUser = { name: user.name, email: user.email, id: user.id };
-    localStorage.setItem('rhythmUser', JSON.stringify(currentUser));
-    startApp();
+    // Network error — server may be starting up (Render free tier sleeps)
+    showAuthError('loginError', '⏳ Server is starting up, please wait a moment and try again…');
   }
 }
 
 // Blocked temporary/disposable email domains
 const BLOCKED_EMAIL_DOMAINS = [
-  'mailinator.com','guerrillamail.com','tempmail.com','throwaway.email',
-  'sharklasers.com','guerrillamailblock.com','grr.la','guerrillamail.info',
-  'spam4.me','trashmail.com','trashmail.me','trashmail.net','trashmail.org',
-  'dispostable.com','yopmail.com','yopmail.fr','yomail.info','cool.fr.nf',
-  'jetable.fr.nf','nospam.ze.tc','nomail.xl.cx','mega.zik.dj','speed.1s.fr',
-  'courriel.fr.nf','moncourrier.fr.nf','monemail.fr.nf','monmail.fr.nf',
-  'maildrop.cc','mailnull.com','spamgourmet.com','spamgourmet.net',
-  'fakeinbox.com','mailnesia.com','discard.email','spambox.us',
-  'getairmail.com','filzmail.com','throwam.com','tempr.email',
-  'dispostable.com','mailexpire.com','mailnull.com','spamhole.com',
-  'binkmail.com','bobmail.info','chammy.info','devnullmail.com',
-  'objectmail.com','ownmail.net','pecinan.com','proxymail.eu',
-  'rklips.com','rmqkr.net','saint-mike.org','spamcon.org',
-  'temporaryemail.net','temporaryinbox.com','tempinbox.co.uk',
-  'tempinbox.com','thanksnospam.info','trbvm.com','turual.com',
-  'uggsrock.com','venompen.com','voidbay.com','wetrainbayarea.org',
+  'mailinator.com', 'guerrillamail.com', 'tempmail.com', 'throwaway.email',
+  'sharklasers.com', 'guerrillamailblock.com', 'grr.la', 'guerrillamail.info',
+  'spam4.me', 'trashmail.com', 'trashmail.me', 'trashmail.net', 'trashmail.org',
+  'dispostable.com', 'yopmail.com', 'yopmail.fr', 'yomail.info', 'cool.fr.nf',
+  'jetable.fr.nf', 'nospam.ze.tc', 'nomail.xl.cx', 'mega.zik.dj', 'speed.1s.fr',
+  'courriel.fr.nf', 'moncourrier.fr.nf', 'monemail.fr.nf', 'monmail.fr.nf',
+  'maildrop.cc', 'mailnull.com', 'spamgourmet.com', 'spamgourmet.net',
+  'fakeinbox.com', 'mailnesia.com', 'discard.email', 'spambox.us',
+  'getairmail.com', 'filzmail.com', 'throwam.com', 'tempr.email',
+  'dispostable.com', 'mailexpire.com', 'mailnull.com', 'spamhole.com',
+  'binkmail.com', 'bobmail.info', 'chammy.info', 'devnullmail.com',
+  'objectmail.com', 'ownmail.net', 'pecinan.com', 'proxymail.eu',
+  'rklips.com', 'rmqkr.net', 'saint-mike.org', 'spamcon.org',
+  'temporaryemail.net', 'temporaryinbox.com', 'tempinbox.co.uk',
+  'tempinbox.com', 'thanksnospam.info', 'trbvm.com', 'turual.com',
+  'uggsrock.com', 'venompen.com', 'voidbay.com', 'wetrainbayarea.org',
 ];
 
 function isValidEmail(email) {
@@ -221,8 +229,8 @@ function isValidEmail(email) {
 //  SIGNUP — DIRECT REGISTRATION (no OTP/email verify)
 // ══════════════════════════════════════════════════════
 async function registerUser() {
-  const name     = document.getElementById('signupName').value.trim();
-  const email    = document.getElementById('signupEmail').value.trim().toLowerCase();
+  const name = document.getElementById('signupName').value.trim();
+  const email = document.getElementById('signupEmail').value.trim().toLowerCase();
   const password = document.getElementById('signupPassword').value;
 
   if (!name || !email || !password)
@@ -232,28 +240,22 @@ async function registerUser() {
   if (password.length < 6)
     return showAuthError('signupError', 'Password must be at least 6 characters.');
 
+  showAuthError('signupError', '⏳ Connecting to server…');
   try {
-    const res  = await fetch(`${API_BASE_URL}/auth/register`, {
+    const res = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email, password })
     });
     const data = await res.json();
     if (!res.ok) return showAuthError('signupError', data.message || 'Sign up failed.');
+    showAuthError('signupError', '');
     currentUser = data.user;
     localStorage.setItem('rhythmUser', JSON.stringify(currentUser));
     localStorage.setItem('rhythmToken', data.token);
     startApp();
   } catch {
-    // Demo fallback — localStorage
-    const users = JSON.parse(localStorage.getItem('rhythmUsers') || '[]');
-    if (users.find(u => u.email === email))
-      return showAuthError('signupError', 'Email already exists.');
-    const uid = 'demo_' + Date.now();
-    users.push({ id: uid, name, email, password, createdAt: new Date().toISOString() });
-    localStorage.setItem('rhythmUsers', JSON.stringify(users));
-    currentUser = { id: uid, name, email };
-    localStorage.setItem('rhythmUser', JSON.stringify(currentUser));
-    startApp();
+    // Network error — server may be starting up (Render free tier sleeps)
+    showAuthError('signupError', '⏳ Server is starting up, please wait a moment and try again…');
   }
 }
 
@@ -420,7 +422,7 @@ function renderSongsGrid(songs, containerId) {
       </div>
       <div class="song-card-info">
         <div class="song-card-title">${esc(song.songName)}</div>
-        <div class="song-card-artist">${esc(song.musicDirector || song.singer)}</div>
+        <div class="song-card-artist">${esc(song.musicDirector || song.singer || '—')}</div>
       </div>
     </div>`
   ).join('');
@@ -471,9 +473,8 @@ function renderSongsList(songs, containerId, showRemove = false, playlistId = nu
       ${song.coverUrl ? `<img class="song-list-cover" src="${song.coverUrl}" alt="" onerror="this.outerHTML='<div class=song-list-cover-ph>🎵</div>'" />` : `<div class="song-list-cover-ph">🎵</div>`}
       <div class="song-list-meta">
         <div class="song-list-title">${esc(song.songName)}</div>
-        <div class="song-list-artist">${esc(song.musicDirector || song.singer)} • ${esc(song.movieName)}</div>
+        <div class="song-list-artist">${esc(buildCreditsText(song))} • ${esc(song.movieName)}</div>
       </div>
-      ${showRemove ? `<button class="card-action-btn" title="Remove" onclick="event.stopPropagation();removeSongFromPlaylist('${playlistId}','${song._id}')">🗑️</button>` : ''}
     </div>`
   ).join('');
   el._songsList = songs;
@@ -501,9 +502,9 @@ function openContextMenu(e, songId, anchorEl) {
   document.getElementById('ctxCover').src = song.coverUrl || '';
   document.getElementById('ctxCover').style.display = song.coverUrl ? 'block' : 'none';
   document.getElementById('ctxTitle').textContent = song.songName;
-  document.getElementById('ctxArtist').textContent = song.musicDirector || song.singer || '';
+  document.getElementById('ctxArtist').textContent = buildCreditsText(song);
   document.getElementById('ctxLikeText').textContent = isLiked(songId) ? 'Remove from Liked Songs' : 'Add to Liked Songs';
-  document.getElementById('ctxLikeBtn').style.color = isLiked(songId) ? 'var(--accent)' : '';
+  document.getElementById('ctxLikeBtn').classList.toggle('liked', isLiked(songId));
   // Update download button state
   isDownloaded(songId).then(dl => {
     const btn = document.getElementById('ctxDownloadBtn');
@@ -522,10 +523,10 @@ function openContextMenu(e, songId, anchorEl) {
     // Desktop right-click — position at cursor
     const menuW = 240, menuH = 320;
     let x = e.clientX, y = e.clientY;
-    if (x + menuW > window.innerWidth)  x = window.innerWidth - menuW - 8;
+    if (x + menuW > window.innerWidth) x = window.innerWidth - menuW - 8;
     if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8;
     menu.style.left = x + 'px';
-    menu.style.top  = y + 'px';
+    menu.style.top = y + 'px';
     menu.style.bottom = 'auto';
     menu.style.transform = 'none';
   } else {
@@ -549,18 +550,18 @@ function closeContextMenu() {
   pctxPlaylistId = null;
 }
 
-function ctxPlay()         { if (ctxSongId) { playSong(ctxSongId); closeContextMenu(); } }
-function ctxPlayNext()     { if (ctxSongId) { playNext(ctxSongId); closeContextMenu(); } }
-function ctxAddToQueue()   { if (ctxSongId) { addToQueue(ctxSongId); closeContextMenu(); } }
-function ctxAddToPlaylist(){ if (ctxSongId) { openAddToPlaylist(ctxSongId); closeContextMenu(); } }
+function ctxPlay() { if (ctxSongId) { playSong(ctxSongId); closeContextMenu(); } }
+function ctxPlayNext() { if (ctxSongId) { playNext(ctxSongId); closeContextMenu(); } }
+function ctxAddToQueue() { if (ctxSongId) { addToQueue(ctxSongId); closeContextMenu(); } }
+function ctxAddToPlaylist() { if (ctxSongId) { openAddToPlaylist(ctxSongId); closeContextMenu(); } }
 function ctxToggleLike() {
   if (ctxSongId) {
     toggleLike(ctxSongId);
     closeContextMenu(); // close immediately after like/unlike
   }
 }
-function ctxViewCredits()  { if (ctxSongId) { openSongDetail(ctxSongId); closeContextMenu(); } }
-function ctxDownload()     { if (ctxSongId) { downloadSong(ctxSongId); closeContextMenu(); } }
+function ctxViewCredits() { if (ctxSongId) { openSongDetail(ctxSongId); closeContextMenu(); } }
+function ctxDownload() { if (ctxSongId) { downloadSong(ctxSongId); closeContextMenu(); } }
 
 // Play Next — insert right after current song
 function playNext(id) {
@@ -633,13 +634,13 @@ function loadAndPlay() {
   resolveAudioSrc(song).then(src => {
     audio.src = src;
     audio.loop = loopMode === 'single';
-    audio.play().catch(() => {});
+    audio.play().catch(() => { });
     isPlaying = true;
     updateNowPlayingUI(song);
     renderQueue();
     try {
       localStorage.setItem('melodiaLastPlayed', JSON.stringify({ songId: song._id, time: 0 }));
-    } catch(e) {}
+    } catch (e) { }
   });
 }
 
@@ -647,7 +648,7 @@ function togglePlayPause() {
   if (requireLogin()) return;
   if (!currentQueue[currentSongIndex]) return;
   if (isPlaying) { audio.pause(); isPlaying = false; }
-  else           { audio.play();  isPlaying = true;  }
+  else { audio.play(); isPlaying = true; }
   updateFsPlayPauseIcon();
 }
 function prevSong() { if (requireLogin()) return; if (currentSongIndex > 0) { currentSongIndex--; loadAndPlay(); } }
@@ -687,11 +688,11 @@ audio.addEventListener('timeupdate', () => {
   if ('mediaSession' in navigator && navigator.mediaSession.setPositionState && audio.duration) {
     try {
       navigator.mediaSession.setPositionState({
-        duration:     audio.duration,
+        duration: audio.duration,
         playbackRate: audio.playbackRate,
-        position:     audio.currentTime,
+        position: audio.currentTime,
       });
-    } catch(e) {}
+    } catch (e) { }
   }
 });
 audio.addEventListener('ended', () => {
@@ -718,7 +719,7 @@ audio.addEventListener('ended', () => {
     }
   }
 });
-audio.addEventListener('play',  () => {
+audio.addEventListener('play', () => {
   isPlaying = true;
   updateFsPlayPauseIcon();
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
@@ -736,11 +737,50 @@ audio.addEventListener('timeupdate', () => {
         songId: currentQueue[currentSongIndex]._id,
         time: Math.floor(audio.currentTime)
       }));
-    } catch(e) {}
+    } catch (e) { }
   }
 });
 
+// ===== CREDITS TEXT BUILDER =====
+// Splits comma-separated fields, deduplicates across all three fields,
+// and returns a single comma-separated string in order:
+//   Music Director, Singer 1, Singer 2, ..., Lyricist 1, Lyricist 2, ...
+// NOTE: lyricist is stored in song.genre field in this app.
+function buildCreditsText(song) {
+  const splitField = (val) =>
+    (val || '').split(',').map(s => s.trim()).filter(Boolean);
+
+  const directors = splitField(song.musicDirector);
+  const singers = splitField(song.singer);
+  const lyricists = splitField(song.genre); // genre field stores lyricist name
+
+  const seen = new Set();
+  const result = [];
+
+  const addUnique = (name) => {
+    const key = name.toLowerCase();
+    if (!seen.has(key)) { seen.add(key); result.push(name); }
+  };
+
+  directors.forEach(addUnique);
+  singers.forEach(addUnique);
+  lyricists.forEach(addUnique);
+
+  return result.length ? result.join(', ') : '—';
+}
+
+// Returns count of unique credit names across all three fields
+function buildCreditsCount(song) {
+  const splitField = (val) =>
+    (val || '').split(',').map(s => s.trim()).filter(Boolean);
+  const seen = new Set();
+  [...splitField(song.musicDirector), ...splitField(song.singer), ...splitField(song.genre)]
+    .forEach(n => seen.add(n.toLowerCase()));
+  return seen.size;
+}
+
 function updateNowPlayingUI(song) {
+
   // ===== MEDIA SESSION API — lock screen / earphone controls =====
   if ('mediaSession' in navigator) {
     // Build artwork array from cover URL
@@ -749,22 +789,22 @@ function updateNowPlayingUI(song) {
       : [];
 
     navigator.mediaSession.metadata = new MediaMetadata({
-      title:  song.songName  || 'Unknown Song',
-      artist: song.singer    || song.musicDirector || '—',
-      album:  song.movieName || '',
+      title: song.songName || 'Unknown Song',
+      artist: buildCreditsText(song),
+      album: song.movieName || '',
       artwork,
     });
 
     // Hardware button handlers (earphones, lock screen, Bluetooth)
-    navigator.mediaSession.setActionHandler('play',         () => { audio.play(); isPlaying = true; updateFsPlayPauseIcon(); });
-    navigator.mediaSession.setActionHandler('pause',        () => { audio.pause(); isPlaying = false; updateFsPlayPauseIcon(); });
-    navigator.mediaSession.setActionHandler('previoustrack',() => prevSong());
-    navigator.mediaSession.setActionHandler('nexttrack',    () => nextSong());
+    navigator.mediaSession.setActionHandler('play', () => { audio.play(); isPlaying = true; updateFsPlayPauseIcon(); });
+    navigator.mediaSession.setActionHandler('pause', () => { audio.pause(); isPlaying = false; updateFsPlayPauseIcon(); });
+    navigator.mediaSession.setActionHandler('previoustrack', () => prevSong());
+    navigator.mediaSession.setActionHandler('nexttrack', () => nextSong());
     navigator.mediaSession.setActionHandler('seekto', e => {
       if (e.seekTime !== undefined) audio.currentTime = e.seekTime;
     });
     // Seek forward/backward (some earphones send these)
-    navigator.mediaSession.setActionHandler('seekforward',  () => { audio.currentTime = Math.min(audio.currentTime + 10, audio.duration || 0); });
+    navigator.mediaSession.setActionHandler('seekforward', () => { audio.currentTime = Math.min(audio.currentTime + 10, audio.duration || 0); });
     navigator.mediaSession.setActionHandler('seekbackward', () => { audio.currentTime = Math.max(audio.currentTime - 10, 0); });
   }
 
@@ -781,15 +821,27 @@ function updateNowPlayingUI(song) {
       npTitleEl.classList.add('np-title-scroll');
     }
   }, 100);
-  const musicDir = song.musicDirector || song.singer || '—';
-  document.getElementById('npArtist').textContent = musicDir;
+  // Build scroll text: Music Director, unique Singers, unique Lyricists (no duplicates)
+  const npArtistText = buildCreditsText(song);
+  const npArtistEl = document.getElementById('npArtist');
+  npArtistEl.classList.remove('np-artist-scroll');
+  // Render plain first, then measure — scroll only if text overflows the container
+  npArtistEl.innerHTML = `<span class="np-artist-inner">${esc(npArtistText)}</span>`;
+  setTimeout(() => {
+    const inner = npArtistEl.querySelector('.np-artist-inner');
+    if (inner && inner.scrollWidth > npArtistEl.clientWidth + 2) {
+      const sep = '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0';
+      const doubled = npArtistText + sep + npArtistText;
+      inner.textContent = doubled;
+      npArtistEl.classList.add('np-artist-scroll');
+    }
+  }, 100);
   const cover = document.getElementById('npCover');
   cover.src = song.coverUrl || ''; cover.style.display = song.coverUrl ? 'block' : 'none';
 
-  // Like button sync
-  const likeEmoji = isLiked(song._id) ? '❤️' : '🤍';
-  const npLike = document.getElementById('npLikeBtn');
-  if (npLike) npLike.textContent = likeEmoji;
+  // Desktop like button
+  const npDesktopLike = document.getElementById('npDesktopLikeBtn');
+  if (npDesktopLike) npDesktopLike.classList.toggle('liked', isLiked(song._id));
 
   // Fullscreen
   // Song title — apply scroll animation if text is long
@@ -817,15 +869,28 @@ function updateNowPlayingUI(song) {
     fsCoverPh.style.display = 'flex';
   }
 
-  // Marquee: Music Director + Singers
-  const parts = [];
-  if (song.musicDirector) parts.push(`🎼 ${song.musicDirector}`);
-  if (song.singer)        parts.push(`🎤 ${song.singer}`);
-  const marqueeText = parts.length ? parts.join('   •   ') : '—';
-  const doubled = `${marqueeText}          ${marqueeText}`;
-  document.getElementById('npfsMarquee').textContent = doubled;
+  // Scroll only if text overflows container
+  const marqueeText = buildCreditsText(song);
+  let marqueeEl = document.getElementById('npfsMarquee');
+  const marqueeWrap = marqueeEl.parentElement;
+  marqueeWrap.classList.remove('npfs-marquee-scroll');
+  // Recreate the element to bust animation cache for accurate measuring
+  marqueeWrap.innerHTML = `<div class="npfs-marquee" id="npfsMarquee">${esc(marqueeText)}</div>`;
+  marqueeEl = document.getElementById('npfsMarquee');
 
-  document.getElementById('npfsLikeBtn').textContent = likeEmoji;
+  setTimeout(() => {
+    const overflows = marqueeEl.scrollWidth > marqueeWrap.clientWidth + 2;
+    if (overflows) {
+      const sep = '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0';
+      marqueeEl.textContent = `${marqueeText}${sep}${marqueeText}`;
+      marqueeWrap.classList.add('npfs-marquee-scroll');
+    }
+  }, 100);
+
+  const isL = isLiked(song._id);
+  document.getElementById('npLikeBtn')?.classList.toggle('liked', isL);
+  document.getElementById('npfsLikeBtn')?.classList.toggle('liked', isL);
+  document.getElementById('npDesktopLikeBtn')?.classList.toggle('liked', isL);
 
   // Lyrics
   const lyricsEl = document.getElementById('npfsLyrics');
@@ -869,6 +934,8 @@ function openNowPlayingScreen() {
   setTimeout(() => {
     const song = currentQueue[currentSongIndex];
     if (!song) return;
+
+    // --- Title ---
     const titleEl = document.getElementById('npfsTitle');
     // Reset and re-render cleanly (element was hidden before, so scrollWidth was 0)
     titleEl.classList.remove('npfs-title-scroll');
@@ -879,6 +946,24 @@ function openNowPlayingScreen() {
       if (inner && inner.scrollWidth > titleEl.clientWidth + 2) {
         inner.textContent = song.songName + '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0' + song.songName;
         titleEl.classList.add('npfs-title-scroll');
+      }
+    });
+
+    // --- Marquee (artist credits) ---
+    let marqueeEl = document.getElementById('npfsMarquee');
+    const marqueeWrap = marqueeEl.parentElement;
+    const marqueeText = buildCreditsText(song);
+    marqueeWrap.classList.remove('npfs-marquee-scroll');
+    // Recreate element to force clear bounds cache
+    marqueeWrap.innerHTML = `<div class="npfs-marquee" id="npfsMarquee">${esc(marqueeText)}</div>`;
+    marqueeEl = document.getElementById('npfsMarquee');
+
+    requestAnimationFrame(() => {
+      const overflows = marqueeEl.scrollWidth > marqueeWrap.clientWidth + 2;
+      if (overflows) {
+        const sep = '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0';
+        marqueeEl.textContent = `${marqueeText}${sep}${marqueeText}`;
+        marqueeWrap.classList.add('npfs-marquee-scroll');
       }
     });
   }, 80);
@@ -906,18 +991,7 @@ function updateFsPlayPauseIcon() {
   document.getElementById('desktopPlayIcon')?.classList.toggle('hidden', isPlaying);
   document.getElementById('desktopPauseIcon')?.classList.toggle('hidden', !isPlaying);
 
-  // Sync fullscreen shuffle/loop active states
-  const fsShuffleBtn = document.getElementById('npfsShuffleBtn');
-  if (fsShuffleBtn) fsShuffleBtn.classList.toggle('active', isShuffle);
-  const fsLoopBtn   = document.getElementById('npfsLoopBtn');
-  const fsLoopBadge = document.getElementById('npfsLoopBadge');
-  if (fsLoopBtn)   fsLoopBtn.classList.toggle('active', loopMode !== 'none');
-  if (fsLoopBadge) fsLoopBadge.classList.toggle('hidden', loopMode !== 'single');
-  // Desktop loop
-  const loopBtn   = document.getElementById('loopBtn');
-  const loopBadge = document.getElementById('loopBadge');
-  if (loopBtn)   loopBtn.classList.toggle('active', loopMode !== 'none');
-  if (loopBadge) loopBadge.classList.toggle('hidden', loopMode !== 'single');
+  updateLoopUI();
   // Desktop queue active
   const qDesktop = document.getElementById('queueDesktopBtn');
   if (qDesktop) {
@@ -929,27 +1003,27 @@ function updateFsPlayPauseIcon() {
 function updateFsProgress() {
   if (!audio.duration) return;
   const pct = (audio.currentTime / audio.duration) * 100;
-  const fill  = document.getElementById('npfsProgressFill');
+  const fill = document.getElementById('npfsProgressFill');
   const thumb = document.getElementById('npfsProgressThumb');
-  if (fill)  fill.style.width  = pct + '%';
-  if (thumb) thumb.style.left  = pct + '%';
+  if (fill) fill.style.width = pct + '%';
+  if (thumb) thumb.style.left = pct + '%';
   document.getElementById('npfsCurrentTime').textContent = fmtTime(audio.currentTime);
-  document.getElementById('npfsTotalTime').textContent   = fmtTime(audio.duration);
+  document.getElementById('npfsTotalTime').textContent = fmtTime(audio.duration);
 }
 function fmtTime(s) {
   if (!s || isNaN(s)) return '0:00';
   return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 }
 
-// ===== SHUFFLE =====
-function toggleShuffle() {
-  isShuffle = !isShuffle;
-  document.getElementById('shuffleBtn').classList.toggle('active', isShuffle);
+// ===== SHUFFLE & LOOP =====
+function setShuffle(state) {
+  if (isShuffle === state) return;
+  isShuffle = state;
   if (isShuffle) {
     originalQueue = [...currentQueue];
     const current = currentQueue[currentSongIndex];
     const rest = currentQueue.filter((_, i) => i !== currentSongIndex);
-    for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
+    for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[rest[i], rest[j]] = [rest[j], rest[i]]; }
     currentQueue = [current, ...rest]; currentSongIndex = 0;
   } else {
     if (originalQueue.length) {
@@ -959,23 +1033,35 @@ function toggleShuffle() {
       if (currentSongIndex === -1) currentSongIndex = 0;
     }
   }
-  renderQueue(); showToast(isShuffle ? '🔀 Shuffle On' : '🔀 Shuffle Off');
+  renderQueue();
 }
 
-// ===== LOOP =====
 function cycleLoop() {
-  if (loopMode === 'none') loopMode = 'playlist';
-  else if (loopMode === 'playlist') loopMode = 'single';
-  else loopMode = 'none';
+  if (loopMode === 'playlist') {
+    loopMode = 'single';
+    setShuffle(false);
+  } else if (loopMode === 'single') {
+    loopMode = 'shuffle';
+    setShuffle(true);
+  } else {
+    loopMode = 'playlist';
+    setShuffle(false);
+  }
   updateLoopUI();
-  const msgs = { none: '🔁 Loop Off', playlist: '🔁 Playlist Loop On', single: '🔂 Single Loop On' };
+  const msgs = { playlist: '🔁 Playlist Loop On', single: '🔂 Single Loop On', shuffle: '🔀 Shuffle On' };
   showToast(msgs[loopMode]);
 }
+
 function updateLoopUI() {
-  const btn = document.getElementById('loopBtn');
-  const badge = document.getElementById('loopBadge');
-  btn.classList.toggle('active', loopMode !== 'none');
-  if (badge) badge.classList.toggle('hidden', loopMode !== 'single');
+  document.querySelectorAll('.loop-icon-repeat').forEach(el => el.classList.toggle('hidden', loopMode !== 'playlist'));
+  document.querySelectorAll('.loop-icon-repeat1').forEach(el => el.classList.toggle('hidden', loopMode !== 'single'));
+  document.querySelectorAll('.loop-icon-shuffle').forEach(el => el.classList.toggle('hidden', loopMode !== 'shuffle'));
+
+  const loopBtn = document.getElementById('loopBtn');
+  const fsLoopBtn = document.getElementById('npfsLoopBtn');
+  if (loopBtn) loopBtn.classList.add('active');
+  if (fsLoopBtn) fsLoopBtn.classList.add('active');
+
   audio.loop = loopMode === 'single';
 }
 
@@ -996,7 +1082,7 @@ function addToQueue(id) {
 // ===== DESKTOP LYRICS PANEL =====
 function toggleLyricsPanel() {
   const panel = document.getElementById('lyricsPanel');
-  const btn   = document.getElementById('lyricsBtn');
+  const btn = document.getElementById('lyricsBtn');
   const isOpen = !panel.classList.contains('hidden');
   panel.classList.toggle('hidden');
   btn?.classList.toggle('active', !isOpen);
@@ -1010,24 +1096,24 @@ function toggleLyricsPanel() {
 
 function updateLyricsPanel() {
   const song = currentQueue[currentSongIndex];
-  const titleEl  = document.getElementById('lyricsPanelTitle');
+  const titleEl = document.getElementById('lyricsPanelTitle');
   const artistEl = document.getElementById('lyricsPanelArtist');
-  const textEl   = document.getElementById('lyricsPanelText');
-  const emptyEl  = document.getElementById('lyricsPanelEmpty');
+  const textEl = document.getElementById('lyricsPanelText');
+  const emptyEl = document.getElementById('lyricsPanelEmpty');
   if (!song) {
-    if (titleEl)  titleEl.textContent  = '—';
+    if (titleEl) titleEl.textContent = '—';
     if (artistEl) artistEl.textContent = '—';
-    if (textEl)   textEl.textContent   = '';
-    if (emptyEl)  emptyEl.style.display = 'flex';
+    if (textEl) textEl.textContent = '';
+    if (emptyEl) emptyEl.style.display = 'flex';
     return;
   }
-  if (titleEl)  titleEl.textContent  = song.songName;
-  if (artistEl) artistEl.textContent = song.musicDirector || song.singer || '—';
+  if (titleEl) titleEl.textContent = song.songName;
+  if (artistEl) artistEl.textContent = buildCreditsText(song);
   if (song.lyrics && song.lyrics.trim()) {
-    if (textEl)  { textEl.textContent = song.lyrics; textEl.style.display = 'block'; }
+    if (textEl) { textEl.textContent = song.lyrics; textEl.style.display = 'block'; }
     if (emptyEl) emptyEl.style.display = 'none';
   } else {
-    if (textEl)  { textEl.textContent = ''; textEl.style.display = 'none'; }
+    if (textEl) { textEl.textContent = ''; textEl.style.display = 'none'; }
     if (emptyEl) emptyEl.style.display = 'flex';
   }
 }
@@ -1038,7 +1124,7 @@ function toggleQueue() {
   const isOpen = panel.classList.contains('hidden');
   panel.classList.toggle('hidden');
   // Sync active state on both possible queue buttons
-  ['queueBtn','queueDesktopBtn'].forEach(id => {
+  ['queueBtn', 'queueDesktopBtn'].forEach(id => {
     document.getElementById(id)?.classList.toggle('active', isOpen);
   });
   // Mobile backdrop
@@ -1088,7 +1174,7 @@ function renderFsQueue() {
       ${current.coverUrl ? `<img class="npfs-queue-cover" src="${current.coverUrl}" alt="" />` : `<div class="npfs-queue-cover-ph">🎵</div>`}
       <div class="npfs-queue-meta">
         <div class="npfs-queue-title">${esc(current.songName)}</div>
-        <div class="npfs-queue-artist">${esc(current.singer || current.musicDirector || '')}</div>
+        <div class="npfs-queue-artist">${esc(buildCreditsText(current))}</div>
       </div>
       <span class="npfs-queue-now-badge">▶ NOW</span>
     </div>`);
@@ -1101,7 +1187,7 @@ function renderFsQueue() {
       ${s.coverUrl ? `<img class="npfs-queue-cover" src="${s.coverUrl}" alt="" />` : `<div class="npfs-queue-cover-ph">🎵</div>`}
       <div class="npfs-queue-meta">
         <div class="npfs-queue-title">${esc(s.songName)}</div>
-        <div class="npfs-queue-artist">${esc(s.singer || s.musicDirector || '')}</div>
+        <div class="npfs-queue-artist">${esc(buildCreditsText(s))}</div>
       </div>
     </div>`);
   });
@@ -1118,7 +1204,7 @@ function queueItemHTML(song, idx, isNow) {
     ${song.coverUrl ? `<img class="queue-cover" src="${song.coverUrl}" alt="" />` : `<div class="queue-cover-ph">🎵</div>`}
     <div class="queue-meta">
       <div class="queue-title">${esc(song.songName)}</div>
-      <div class="queue-artist">${esc(song.singer || '')}</div>
+      <div class="queue-artist">${esc(buildCreditsText(song))}</div>
     </div>
     ${isNow
       ? '<span style="color:var(--accent);font-size:11px;flex-shrink:0;">▶ Now</span>'
@@ -1154,17 +1240,19 @@ async function toggleLike(id) {
   if (isLiked(id)) likedSongs = likedSongs.filter(i => i !== id); else likedSongs.push(id);
   await saveLikedSongs();
   const liked = isLiked(id);
-  const emoji = liked ? '❤️' : '🤍';
   // Update all song card like buttons
   document.querySelectorAll(`[id="likeBtn-${id}"]`).forEach(btn => {
-    btn.textContent = emoji; btn.classList.toggle('liked', liked);
+    btn.classList.toggle('liked', liked);
   });
   // Sync mini bar like button
   const miniLike = document.getElementById('npLikeBtn');
-  if (miniLike && currentQueue[currentSongIndex]?._id === id) miniLike.textContent = emoji;
+  if (miniLike && currentQueue[currentSongIndex]?._id === id) miniLike.classList.toggle('liked', liked);
   // Sync fullscreen like button
   const fsLike = document.getElementById('npfsLikeBtn');
-  if (fsLike && currentQueue[currentSongIndex]?._id === id) fsLike.textContent = emoji;
+  if (fsLike && currentQueue[currentSongIndex]?._id === id) fsLike.classList.toggle('liked', liked);
+  // Sync desktop like button
+  const desktopLike = document.getElementById('npDesktopLikeBtn');
+  if (desktopLike && currentQueue[currentSongIndex]?._id === id) desktopLike.classList.toggle('liked', liked);
   renderLikedSection();
 }
 function toggleLikeCurrent() { const s = currentQueue[currentSongIndex]; if (s) toggleLike(s._id); }
@@ -1272,7 +1360,7 @@ function openPlaylistContextMenu(e, id, anchorEl) {
   document.getElementById('pctxTitle').textContent = pl.name;
   document.getElementById('pctxCount').textContent = `${pl.songs.length} song${pl.songs.length !== 1 ? 's' : ''}`;
 
-  const menu   = document.getElementById('playlistContextMenu');
+  const menu = document.getElementById('playlistContextMenu');
   const backdrop = document.getElementById('ctxBackdrop');
   // Close song context menu if open
   document.getElementById('songContextMenu')?.classList.add('hidden');
@@ -1283,10 +1371,10 @@ function openPlaylistContextMenu(e, id, anchorEl) {
     // Desktop right-click
     const menuW = 240, menuH = 180;
     let x = e.clientX, y = e.clientY;
-    if (x + menuW > window.innerWidth)  x = window.innerWidth - menuW - 8;
+    if (x + menuW > window.innerWidth) x = window.innerWidth - menuW - 8;
     if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8;
     menu.style.left = x + 'px';
-    menu.style.top  = y + 'px';
+    menu.style.top = y + 'px';
     menu.style.bottom = 'auto';
     menu.style.transform = 'none';
     menu.style.borderRadius = '14px';
@@ -1412,19 +1500,45 @@ function stripSuffix(q) {
   return q.replace(/\s+(songs?|music|album|tracks?|hits?|all songs?)\s*$/i, '').trim();
 }
 
-// Check if a string contains the query (or vice versa) — flexible partial match
+// Normalize string — remove spaces and lowercase for space-insensitive matching
+function normalizeStr(s) {
+  return (s || '').toLowerCase().replace(/\s+/g, '');
+}
+
+// Check if a string contains the query (or vice versa) — flexible partial match, space-aware
 function fuzzyMatch(str, q) {
   if (!str || !q) return false;
   const s = str.toLowerCase(), t = q.toLowerCase();
-  return s.includes(t) || t.includes(s);
+  if (s.includes(t) || t.includes(s)) return true;
+  // Space-normalized match (e.g. "TheRajaSaab" matches "The Raja Saab")
+  const sn = normalizeStr(s), tn = normalizeStr(t);
+  if (sn === tn) return true;
+  // Prevent aggressive bridging across boundaries for short acronym-like queries
+  // (e.g., stopping "ntr" from matching "Silambarasan TR" -> "silambarasantr")
+  if (tn.length > 3) {
+    return sn.includes(tn) || tn.includes(sn);
+  }
+  return false;
+}
+
+// Similarity score (0–1): how well the entity value covers the query
+// A score of 1.0 means exact match; prefer values that are close in length to the query
+function similarityScore(str, q) {
+  if (!str || !q) return 0;
+  const s = normalizeStr(str), t = normalizeStr(q);
+  if (!s || !t) return 0;
+  if (s === t) return 1;
+  if (s.includes(t)) return t.length / s.length;   // query fits inside entity
+  if (t.includes(s)) return s.length / t.length;   // entity fits inside query
+  return 0;
 }
 
 // Score: how many songs match this entity value for a given field
 function scoreEntity(songs, field, q) {
   const matched = songs.filter(s => {
     const val = (s[field] || '').toLowerCase();
-    // For multi-value fields like cast/singer, split by comma
-    if (field === 'cast' || field === 'singer') {
+    // For multi-value fields like cast/singer/song_category, split by comma
+    if (field === 'cast' || field === 'singer' || field === 'song_category') {
       return val.split(',').map(p => p.trim()).some(p => fuzzyMatch(p, q));
     }
     return fuzzyMatch(val, q);
@@ -1450,51 +1564,82 @@ function liveSearch(query) {
   // Broad match: find any song touching this query across all fields
   const broadResults = allSongs.filter(s => {
     const fields = [s.songName, s.movieName, s.singer, s.musicDirector,
-                    s.movieDirector, s.cast, s.label, s.genre];
+    s.movieDirector, s.cast, s.label, s.genre,
+    s.song_category, s.song_language];
     return fields.some(f => fuzzyMatch(f || '', coreQuery));
   });
 
   if (!broadResults.length) { showNoResults(raw); return; }
 
-  // ── Try to detect a single dominant entity ──────────────────────
-  // Score each field: which single value matches best?
+  // ── Best-match entity detection ──────────────────────────────────
+  // Evaluate ALL field types simultaneously and pick the entity with the
+  // HIGHEST similarity score to the query (more specific = higher score).
+  // This prevents a short category name like "Love" from beating a specific
+  // movie name like "Love Insurance Kompany" for the query "love insurance kompany".
   const checks = [
-    { field: 'movieName',      label: 'Movie Album',     icon: '🎬' },
-    { field: 'musicDirector',  label: 'Music Director',  icon: '🎼' },
-    { field: 'singer',         label: 'Singer',          icon: '🎤' },
-    { field: 'genre',          label: 'Lyricist',        icon: '✍️' }, // genre = lyricist in schema
-    { field: 'cast',           label: 'Actor / Actress', icon: '🎭' },
-    { field: 'movieDirector',  label: 'Movie Director',  icon: '🎥' },
+    { field: 'movieName', label: 'Movie Album', icon: '🎬' },
+    { field: 'singer', label: 'Artist', icon: '👤' },
+    { field: 'musicDirector', label: 'Artist', icon: '👤' },
+    { field: 'cast', label: 'Artist', icon: '👤' },
+    { field: 'movieDirector', label: 'Artist', icon: '👤' },
+    { field: 'genre', label: 'Artist', icon: '👤' },
+    { field: 'song_category', label: 'Category', icon: '🎵' },
+    { field: 'song_language', label: 'Language', icon: '🎵' },
   ];
 
+  let bestVal = null, bestScore = 0, bestField = null, bestLabel = null, bestIcon = null;
+
   for (const { field, label, icon } of checks) {
-    // Collect all unique values for this field among broad results
+    // Collect all unique individual values for this field among broad results
     const uniqueVals = new Set();
     broadResults.forEach(s => {
       const val = s[field] || '';
-      if (field === 'cast' || field === 'singer') {
+      if (field === 'cast' || field === 'singer' || field === 'song_category') {
         val.split(',').map(p => p.trim()).filter(Boolean).forEach(p => uniqueVals.add(p));
       } else {
         if (val) uniqueVals.add(val);
       }
     });
 
-    // Find the value that best matches the core query
-    let bestVal = null, bestCount = 0;
     for (const val of uniqueVals) {
-      if (!fuzzyMatch(val, coreQuery)) continue;
-      const { matched } = scoreEntity(allSongs, field, val);
-      if (matched.length > bestCount) { bestCount = matched.length; bestVal = val; }
-    }
-
-    if (bestVal && bestCount >= 1) {
-      // Get ALL songs in the library with this entity (not just broadResults)
-      const { matched: allMatched } = scoreEntity(allSongs, field, bestVal);
-      if (allMatched.length >= 1) {
-        // Show album/artist view for this entity
-        showEntityView(bestVal, allMatched, label, icon, field);
-        return;
+      const sim = similarityScore(val, coreQuery);
+      if (sim === 0) continue;
+      // Slight tie-break: among equal similarity scores, prefer longer (more specific) entity names
+      const tieScore = sim + (normalizeStr(val).length / 100000);
+      if (tieScore > bestScore) {
+        const { matched } = scoreEntity(allSongs, field, val);
+        if (matched.length >= 1) {
+          bestScore = tieScore;
+          bestVal = val;
+          bestField = field;
+          bestLabel = label;
+          bestIcon = icon;
+        }
       }
+    }
+  }
+
+  if (bestVal) {
+    // For person-type fields, expand results to ALL songs where the name appears
+    // in ANY person-related field (not just the detected field)
+    let allMatched;
+    if (['singer', 'cast', 'musicDirector', 'movieDirector', 'genre'].includes(bestField)) {
+      allMatched = allSongs.filter(s => {
+        const personFields = [
+          s.singer || '', s.cast || '', s.musicDirector || '',
+          s.movieDirector || '', s.genre || ''
+        ];
+        return personFields.some(f =>
+          f.split(',').map(p => p.trim()).some(p => fuzzyMatch(p, bestVal))
+        );
+      });
+    } else {
+      const result = scoreEntity(allSongs, bestField, bestVal);
+      allMatched = result.matched;
+    }
+    if (allMatched.length >= 1) {
+      showEntityView(bestVal, allMatched, bestLabel, bestIcon, bestField);
+      return;
     }
   }
 
@@ -1508,7 +1653,9 @@ function showEntityView(name, songs, label, icon, field) {
   document.getElementById('genericSearch').classList.add('hidden');
 
   document.getElementById('albumHeroType').textContent = label;
-  document.getElementById('albumHeroTitle').textContent = name;
+  // Append " Songs" to the title for all entity types except Movie Album
+  const displayName = field === 'movieName' ? name : name + ' Songs';
+  document.getElementById('albumHeroTitle').textContent = displayName;
 
   // Build subtitle
   const movies = [...new Set(songs.map(s => s.movieName).filter(Boolean))];
@@ -1518,7 +1665,7 @@ function showEntityView(name, songs, label, icon, field) {
     const dir = songs[0]?.movieDirector || '';
     if (md) sub += `  •  🎼 ${md}`;
     if (dir) sub += `  •  🎬 ${dir}`;
-  } else if (field !== 'singer' && field !== 'genre') {
+  } else {
     sub += `  •  ${movies.length} movie${movies.length !== 1 ? 's' : ''}`;
   }
   document.getElementById('albumHeroSub').textContent = sub;
@@ -1540,14 +1687,15 @@ function showEntityView(name, songs, label, icon, field) {
       img.classList.add('hidden'); ph.style.display = 'flex'; ph.textContent = '🎬';
     }
   } else {
-    // Non-movie: always show icon placeholder, no cover photos
+    // Non-movie: show appropriate placeholder icon
     if (collage) collage.remove();
     img.classList.add('hidden'); ph.style.display = 'flex';
-    ph.textContent = icon;
+    // Category and Language get music note icon; people get human icon
+    ph.textContent = (field === 'song_category' || field === 'song_language') ? '🎵' : '👤';
   }
 
-  // For cast/actor — group by movie
-  if (field === 'cast' || field === 'movieDirector') {
+  // For all person-type fields — group songs by movie
+  if (['cast', 'movieDirector', 'singer', 'musicDirector', 'genre'].includes(field)) {
     const listEl = document.getElementById('albumSongsList');
     listEl.innerHTML = '';
     const byMovie = {};
@@ -1578,7 +1726,7 @@ function renderSongsListItem(song) {
     ${song.coverUrl ? `<img class="song-list-cover" src="${song.coverUrl}" alt="" onerror="this.outerHTML='<div class=song-list-cover-ph>🎵</div>'" />` : `<div class="song-list-cover-ph">🎵</div>`}
     <div class="song-list-meta">
       <div class="song-list-title">${esc(song.songName)}</div>
-      <div class="song-list-artist">${esc(song.musicDirector || song.singer)} • ${esc(song.movieName)}</div>
+      <div class="song-list-artist">${esc(buildCreditsText(song))} • ${esc(song.movieName)}</div>
     </div>
   </div>`;
 }
@@ -1608,15 +1756,15 @@ function showGroupedResults(raw, results) {
   const grouped = document.getElementById('searchGrouped');
   grouped.innerHTML = '';
 
-  const byMovie    = groupBy(results, 'movieName');
+  const byMovie = groupBy(results, 'movieName');
   const byDirector = groupBy(results, 'musicDirector');
-  const bySinger   = groupByMulti(results, 'singer');
+  const bySinger = groupByMulti(results, 'singer');
   const byLyricist = groupBy(results, 'genre'); // genre = lyricist
 
-  const multiMovies   = Object.entries(byMovie).filter(([,s]) => s.length >= 2);
-  const multiMD       = Object.entries(byDirector).filter(([,s]) => s.length >= 2);
-  const multiSinger   = Object.entries(bySinger).filter(([,s]) => s.length >= 2);
-  const multiLyricist = Object.entries(byLyricist).filter(([,s]) => s.length >= 2);
+  const multiMovies = Object.entries(byMovie).filter(([, s]) => s.length >= 2);
+  const multiMD = Object.entries(byDirector).filter(([, s]) => s.length >= 2);
+  const multiSinger = Object.entries(bySinger).filter(([, s]) => s.length >= 2);
+  const multiLyricist = Object.entries(byLyricist).filter(([, s]) => s.length >= 2);
 
   if (multiMovies.length) {
     grouped.appendChild(makeGroupSection('🎬 Movies', multiMovies.map(([name, songs]) =>
@@ -1626,23 +1774,23 @@ function showGroupedResults(raw, results) {
       </div>`).join(''), true));
   }
   if (multiMD.length) {
-    grouped.appendChild(makeGroupSection('🎼 Music Directors', multiMD.map(([name, songs]) =>
+    grouped.appendChild(makeGroupSection('👤 Music Directors', multiMD.map(([name, songs]) =>
       `<div class="entity-card" onclick="triggerAlbumSearch('${esc(name)}')">
-        <span class="entity-card-icon">🎼</span>
+        <span class="entity-card-icon">👤</span>
         <span>${esc(name)}</span><span style="color:var(--text-muted);font-size:12px;margin-left:auto;">${songs.length} songs</span>
       </div>`).join(''), true));
   }
   if (multiSinger.length) {
-    grouped.appendChild(makeGroupSection('🎤 Singers', multiSinger.map(([name, songs]) =>
+    grouped.appendChild(makeGroupSection('👤 Singers', multiSinger.map(([name, songs]) =>
       `<div class="entity-card" onclick="triggerAlbumSearch('${esc(name)}')">
-        <span class="entity-card-icon">🎤</span>
+        <span class="entity-card-icon">👤</span>
         <span>${esc(name)}</span><span style="color:var(--text-muted);font-size:12px;margin-left:auto;">${songs.length} songs</span>
       </div>`).join(''), true));
   }
   if (multiLyricist.length) {
-    grouped.appendChild(makeGroupSection('✍️ Lyricists', multiLyricist.map(([name, songs]) =>
+    grouped.appendChild(makeGroupSection('👤 Lyricists', multiLyricist.map(([name, songs]) =>
       `<div class="entity-card" onclick="triggerAlbumSearch('${esc(name)}')">
-        <span class="entity-card-icon">✍️</span>
+        <span class="entity-card-icon">👤</span>
         <span>${esc(name)}</span><span style="color:var(--text-muted);font-size:12px;margin-left:auto;">${songs.length} songs</span>
       </div>`).join(''), true));
   }
@@ -1656,7 +1804,10 @@ function showGroupedResults(raw, results) {
   results.forEach(song => {
     const tmp = document.createElement('div');
     tmp.innerHTML = renderSongsListItem(song);
-    songList.appendChild(tmp.firstChild);
+    const el = tmp.firstChild;
+    // Override onclick: open the song's movie album and highlight the clicked song
+    el.setAttribute('onclick', `openMovieAlbumForSong('${song._id}')`);
+    songList.appendChild(el);
   });
   songList._songsList = results;
   songGroup.appendChild(songList);
@@ -1739,7 +1890,7 @@ function showSectionInternal(name) {
   localStorage.setItem('melodiaSection', name);
   document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
   document.getElementById('searchResultsSection').classList.add('hidden');
-  ['navLiked','navDownloads','navPlaylists','navAccount'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+  ['navLiked', 'navDownloads', 'navPlaylists', 'navAccount'].forEach(id => document.getElementById(id)?.classList.remove('active'));
   const navMap = { liked: 'navLiked', downloads: 'navDownloads', playlists: 'navPlaylists', account: 'navAccount' };
   if (navMap[name]) document.getElementById(navMap[name])?.classList.add('active');
   const map = { home: 'homeSection', search: 'homeSection', liked: 'likedSection', downloads: 'downloadsSection', playlists: 'playlistsSection', account: 'accountSection' };
@@ -1773,7 +1924,7 @@ function openSongDetail(id) {
     ['Lyricist', song.genre], ['Movie Director', song.movieDirector],
     ['Label', song.label], ['Year', song.year]
   ];
-  document.getElementById('sdTable').innerHTML = fields.filter(([,v]) => v).map(([k,v]) => `<tr><td>${k}</td><td>${esc(String(v))}</td></tr>`).join('');
+  document.getElementById('sdTable').innerHTML = fields.filter(([, v]) => v).map(([k, v]) => `<tr><td>${k}</td><td>${esc(String(v))}</td></tr>`).join('');
   document.getElementById('songDetailModal').classList.remove('hidden');
 }
 function closeSongDetail() { document.getElementById('songDetailModal').classList.add('hidden'); currentDetailSongId = null; }
@@ -1819,7 +1970,7 @@ async function changeDisplayName() {
 async function changePassword() {
   if (currentUser.isGuest) return showMsg('passwordChangeMsg', 'Please login first!');
   const current = document.getElementById('currentPassword').value;
-  const newPwd  = document.getElementById('newPassword').value;
+  const newPwd = document.getElementById('newPassword').value;
   const confirm = document.getElementById('confirmNewPassword').value;
   if (!current || !newPwd || !confirm) return showMsg('passwordChangeMsg', 'Please fill all fields.');
   if (newPwd.length < 6) return showMsg('passwordChangeMsg', 'Min 6 characters required.');
@@ -1837,10 +1988,10 @@ async function changePassword() {
     user.password = newPwd; localStorage.setItem('rhythmUsers', JSON.stringify(users));
     showMsg('passwordChangeMsg', '✅ Password updated!');
   }
-  ['currentPassword','newPassword','confirmNewPassword'].forEach(id => document.getElementById(id).value = '');
+  ['currentPassword', 'newPassword', 'confirmNewPassword'].forEach(id => document.getElementById(id).value = '');
   // Uncheck show password checkbox
   const cb = document.querySelector('input[onchange*="currentPassword"]');
-  if (cb) { cb.checked = false; togglePwdGroup(['currentPassword','newPassword','confirmNewPassword'], cb); }
+  if (cb) { cb.checked = false; togglePwdGroup(['currentPassword', 'newPassword', 'confirmNewPassword'], cb); }
   setTimeout(() => showMsg('passwordChangeMsg', ''), 4000);
 }
 
@@ -1869,7 +2020,7 @@ function closeConfirm() {
 }
 
 // ===== SPACEBAR =====
-document.addEventListener('keydown', function(e) {
+document.addEventListener('keydown', function (e) {
   const tag = document.activeElement?.tagName?.toLowerCase();
   if (tag === 'input' || tag === 'textarea') return;
   if (e.code === 'Space' && currentQueue[currentSongIndex]) { e.preventDefault(); togglePlayPause(); }
@@ -1902,7 +2053,7 @@ function focusMobileSearch() {
 }
 function esc(str) {
   if (!str) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // ===================================================================
@@ -1999,7 +2150,7 @@ async function downloadSong(songId) {
 
     let coverBlob = null;
     if (song.coverUrl) {
-      try { const r = await fetch(song.coverUrl); if (r.ok) coverBlob = await r.blob(); } catch {}
+      try { const r = await fetch(song.coverUrl); if (r.ok) coverBlob = await r.blob(); } catch { }
     }
 
     const metadata = {
@@ -2062,7 +2213,7 @@ async function syncDownloadsFromCloud() {
         const audioBlob = await audioRes.blob();
         let coverBlob = null;
         if (song.coverUrl) {
-          try { const r = await fetch(song.coverUrl); if (r.ok) coverBlob = await r.blob(); } catch {}
+          try { const r = await fetch(song.coverUrl); if (r.ok) coverBlob = await r.blob(); } catch { }
         }
         const metadata = {
           _id: song._id, songName: song.songName, movieName: song.movieName,
@@ -2072,7 +2223,7 @@ async function syncDownloadsFromCloud() {
           cast: song.cast, coverBlob,
         };
         await saveDownload(songId, audioBlob, metadata);
-      } catch {}
+      } catch { }
     }
     showToast(`✅ Downloads synced!`);
     if (currentSection === 'downloads') renderDownloadsSection();
@@ -2098,7 +2249,7 @@ async function renderDownloadsSection() {
       ${coverUrl ? `<img class="song-list-cover" src="${coverUrl}" alt="" />` : `<div class="song-list-cover-ph">🎵</div>`}
       <div class="song-list-meta">
         <div class="song-list-title">${esc(m.songName)}</div>
-        <div class="song-list-artist">${esc(m.musicDirector || m.singer || '—')} • ${esc(m.movieName || '')}</div>
+        <div class="song-list-artist">${esc(buildCreditsText(m))} • ${esc(m.movieName || '')}</div>
       </div>
       <button class="card-action-btn" title="Remove" onclick="event.stopPropagation();removeDownloadedSong('${d.id}')">🗑️</button>
     </div>`;
@@ -2153,13 +2304,13 @@ async function resolveAudioSrc(song) {
 // ===== END DOWNLOADS =====
 
 // Close modals on overlay click
-['createPlaylistModal','renamePlaylistModal','addToPlaylistModal','songDetailModal','confirmModal'].forEach(id => {
+['createPlaylistModal', 'renamePlaylistModal', 'addToPlaylistModal', 'songDetailModal', 'confirmModal'].forEach(id => {
   const el = document.getElementById(id);
-  if (el) el.addEventListener('click', function(e) { if (e.target === this) this.classList.add('hidden'); });
+  if (el) el.addEventListener('click', function (e) { if (e.target === this) this.classList.add('hidden'); });
 });
 const authModalEl = document.getElementById('authModal');
 if (authModalEl) {
-  authModalEl.addEventListener('click', function(e) {
+  authModalEl.addEventListener('click', function (e) {
     if (e.target === this && currentUser?.isGuest) { this.classList.add('hidden'); this.classList.remove('active'); }
   });
 }
