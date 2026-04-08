@@ -23,30 +23,70 @@ function togglePwd(inputId, checkbox) {
   if (input) input.type = checkbox.checked ? 'text' : 'password';
 }
 
+// ===== SERVER WAKE-UP (Render free tier sleeps after 15 min) =====
+async function wakeUpServer(maxWaitMs = 35000) {
+  const ping = async () => {
+    try {
+      const r = await fetch(`${API_BASE_URL}/songs`, { cache: 'no-store' });
+      return r.ok;
+    } catch { return false; }
+  };
+  if (await ping()) return true;
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    await new Promise(r => setTimeout(r, 3000));
+    if (await ping()) return true;
+    const s = Math.round((Date.now() - start) / 1000);
+    adminErr(`⏳ Server is waking up… (${s}s) — please wait`);
+  }
+  return false;
+}
+
 // ===== ADMIN LOGIN =====
 async function adminLogin() {
   const email = document.getElementById('adminEmail').value.trim();
   const password = document.getElementById('adminPassword').value;
   if (!email || !password) return adminErr('Please enter credentials.');
+
+  const loginBtn = document.querySelector('button[onclick="adminLogin()"]');
+  if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'Connecting…'; }
+
   try {
+    adminErr('⏳ Connecting to server…');
+    const alive = await wakeUpServer(35000);
+    if (!alive) {
+      if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Login as Admin'; }
+      return adminErr('❌ Server unreachable. Check your backend URL or Render dashboard.');
+    }
+
     const res = await fetch(`${API_BASE_URL}/auth/admin-login`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
     const data = await res.json();
-    if (!res.ok) return adminErr(data.message || 'Invalid admin credentials.');
+    if (!res.ok) {
+      if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Login as Admin'; }
+      return adminErr(data.message || 'Invalid admin credentials.');
+    }
     adminToken = data.token;
     localStorage.setItem('rhythmAdminToken', adminToken);
     startAdminApp();
-  } catch {
-    adminErr('Cannot connect to server. Make sure node server.js is running.');
+  } catch (e) {
+    if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Login as Admin'; }
+    adminErr('❌ Cannot connect to server. Check your internet connection.');
   }
 }
 
 function adminErr(msg) {
   const el = document.getElementById('adminLoginError');
+  if (!el) return;
   el.textContent = msg;
-  setTimeout(() => el.textContent = '', 5000);
+  // Clear auto-dismiss timer if set — wake-up messages stay until replaced
+  if (el._clearTimer) clearTimeout(el._clearTimer);
+  // Only auto-clear short/final messages, not ongoing status messages
+  if (!msg.startsWith('⏳')) {
+    el._clearTimer = setTimeout(() => { el.textContent = ''; }, 6000);
+  }
 }
 
 // Auto-logout when token has expired
