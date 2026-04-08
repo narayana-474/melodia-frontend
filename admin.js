@@ -7,8 +7,8 @@
 //   👇 Replace this with your actual deployed backend URL
 const DEPLOYED_BACKEND_URL = 'https://melodia-backend-5f8g.onrender.com/api';
 
-const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? 'http://localhost:5000/api'
+const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.0')
+  ? 'http://localhost:5003/api'
   : DEPLOYED_BACKEND_URL;
 // ===================================================================
 
