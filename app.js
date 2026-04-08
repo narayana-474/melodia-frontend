@@ -13,8 +13,8 @@ const API_BASE_URL = (window.location.hostname === 'localhost' || window.locatio
 
 // ── Wake Render server if sleeping (free tier sleeps after 15 min) ──
 async function wakeUpServer(statusElId, maxWaitMs = 28000) {
-  const el    = statusElId ? document.getElementById(statusElId) : null;
-  const ping  = async () => {
+  const el = statusElId ? document.getElementById(statusElId) : null;
+  const ping = async () => {
     try { const r = await fetch(`${API_BASE_URL}/songs`, { cache: 'no-store' }); return r.ok; }
     catch { return false; }
   };
@@ -43,7 +43,7 @@ const firebaseConfig = {
 
 let firebaseApp, firebaseAuth;
 try {
-  firebaseApp  = firebase.initializeApp(firebaseConfig);
+  firebaseApp = firebase.initializeApp(firebaseConfig);
   firebaseAuth = firebase.auth();
 } catch (e) { console.warn('Firebase not configured:', e.message); }
 
@@ -63,9 +63,9 @@ async function signInWithGoogle() {
 
 async function handleSocialAuthResult(result) {
   const fu = result.user;
-  const name  = fu.displayName || fu.email?.split('@')[0] || 'User';
+  const name = fu.displayName || fu.email?.split('@')[0] || 'User';
   const email = fu.email;
-  const uid   = fu.uid;
+  const uid = fu.uid;
   if (!email) { showAuthError('loginError', 'Could not get email. Please use email login.'); return; }
   try {
     const res = await fetch(`${API_BASE_URL}/auth/social-login`, {
@@ -188,22 +188,22 @@ async function loginUser() {
 
 // Blocked temporary/disposable email domains
 const BLOCKED_EMAIL_DOMAINS = [
-  'mailinator.com','guerrillamail.com','tempmail.com','throwaway.email',
-  'sharklasers.com','guerrillamailblock.com','grr.la','guerrillamail.info',
-  'spam4.me','trashmail.com','trashmail.me','trashmail.net','trashmail.org',
-  'dispostable.com','yopmail.com','yopmail.fr','yomail.info','cool.fr.nf',
-  'jetable.fr.nf','nospam.ze.tc','nomail.xl.cx','mega.zik.dj','speed.1s.fr',
-  'courriel.fr.nf','moncourrier.fr.nf','monemail.fr.nf','monmail.fr.nf',
-  'maildrop.cc','mailnull.com','spamgourmet.com','spamgourmet.net',
-  'fakeinbox.com','mailnesia.com','discard.email','spambox.us',
-  'getairmail.com','filzmail.com','throwam.com','tempr.email',
-  'dispostable.com','mailexpire.com','mailnull.com','spamhole.com',
-  'binkmail.com','bobmail.info','chammy.info','devnullmail.com',
-  'objectmail.com','ownmail.net','pecinan.com','proxymail.eu',
-  'rklips.com','rmqkr.net','saint-mike.org','spamcon.org',
-  'temporaryemail.net','temporaryinbox.com','tempinbox.co.uk',
-  'tempinbox.com','thanksnospam.info','trbvm.com','turual.com',
-  'uggsrock.com','venompen.com','voidbay.com','wetrainbayarea.org',
+  'mailinator.com', 'guerrillamail.com', 'tempmail.com', 'throwaway.email',
+  'sharklasers.com', 'guerrillamailblock.com', 'grr.la', 'guerrillamail.info',
+  'spam4.me', 'trashmail.com', 'trashmail.me', 'trashmail.net', 'trashmail.org',
+  'dispostable.com', 'yopmail.com', 'yopmail.fr', 'yomail.info', 'cool.fr.nf',
+  'jetable.fr.nf', 'nospam.ze.tc', 'nomail.xl.cx', 'mega.zik.dj', 'speed.1s.fr',
+  'courriel.fr.nf', 'moncourrier.fr.nf', 'monemail.fr.nf', 'monmail.fr.nf',
+  'maildrop.cc', 'mailnull.com', 'spamgourmet.com', 'spamgourmet.net',
+  'fakeinbox.com', 'mailnesia.com', 'discard.email', 'spambox.us',
+  'getairmail.com', 'filzmail.com', 'throwam.com', 'tempr.email',
+  'dispostable.com', 'mailexpire.com', 'mailnull.com', 'spamhole.com',
+  'binkmail.com', 'bobmail.info', 'chammy.info', 'devnullmail.com',
+  'objectmail.com', 'ownmail.net', 'pecinan.com', 'proxymail.eu',
+  'rklips.com', 'rmqkr.net', 'saint-mike.org', 'spamcon.org',
+  'temporaryemail.net', 'temporaryinbox.com', 'tempinbox.co.uk',
+  'tempinbox.com', 'thanksnospam.info', 'trbvm.com', 'turual.com',
+  'uggsrock.com', 'venompen.com', 'voidbay.com', 'wetrainbayarea.org',
 ];
 
 function isValidEmail(email) {
@@ -229,8 +229,8 @@ function isValidEmail(email) {
 //  SIGNUP — DIRECT REGISTRATION (no OTP/email verify)
 // ══════════════════════════════════════════════════════
 async function registerUser() {
-  const name     = document.getElementById('signupName').value.trim();
-  const email    = document.getElementById('signupEmail').value.trim().toLowerCase();
+  const name = document.getElementById('signupName').value.trim();
+  const email = document.getElementById('signupEmail').value.trim().toLowerCase();
   const password = document.getElementById('signupPassword').value;
 
   if (!name || !email || !password)
@@ -241,7 +241,7 @@ async function registerUser() {
     return showAuthError('signupError', 'Password must be at least 6 characters.');
 
   try {
-    const res  = await fetch(`${API_BASE_URL}/auth/register`, {
+    const res = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email, password })
     });
@@ -428,7 +428,7 @@ function renderSongsGrid(songs, containerId) {
       </div>
       <div class="song-card-info">
         <div class="song-card-title">${esc(song.songName)}</div>
-        <div class="song-card-artist">${esc(buildCreditsText(song))}</div>
+        <div class="song-card-artist">${esc(song.musicDirector || song.singer || '—')}</div>
       </div>
     </div>`
   ).join('');
@@ -481,7 +481,6 @@ function renderSongsList(songs, containerId, showRemove = false, playlistId = nu
         <div class="song-list-title">${esc(song.songName)}</div>
         <div class="song-list-artist">${esc(buildCreditsText(song))} • ${esc(song.movieName)}</div>
       </div>
-      ${showRemove ? `<button class="card-action-btn" title="Remove" onclick="event.stopPropagation();removeSongFromPlaylist('${playlistId}','${song._id}')">🗑️</button>` : ''}
     </div>`
   ).join('');
   el._songsList = songs;
@@ -530,10 +529,10 @@ function openContextMenu(e, songId, anchorEl) {
     // Desktop right-click — position at cursor
     const menuW = 240, menuH = 320;
     let x = e.clientX, y = e.clientY;
-    if (x + menuW > window.innerWidth)  x = window.innerWidth - menuW - 8;
+    if (x + menuW > window.innerWidth) x = window.innerWidth - menuW - 8;
     if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8;
     menu.style.left = x + 'px';
-    menu.style.top  = y + 'px';
+    menu.style.top = y + 'px';
     menu.style.bottom = 'auto';
     menu.style.transform = 'none';
   } else {
@@ -557,18 +556,18 @@ function closeContextMenu() {
   pctxPlaylistId = null;
 }
 
-function ctxPlay()         { if (ctxSongId) { playSong(ctxSongId); closeContextMenu(); } }
-function ctxPlayNext()     { if (ctxSongId) { playNext(ctxSongId); closeContextMenu(); } }
-function ctxAddToQueue()   { if (ctxSongId) { addToQueue(ctxSongId); closeContextMenu(); } }
-function ctxAddToPlaylist(){ if (ctxSongId) { openAddToPlaylist(ctxSongId); closeContextMenu(); } }
+function ctxPlay() { if (ctxSongId) { playSong(ctxSongId); closeContextMenu(); } }
+function ctxPlayNext() { if (ctxSongId) { playNext(ctxSongId); closeContextMenu(); } }
+function ctxAddToQueue() { if (ctxSongId) { addToQueue(ctxSongId); closeContextMenu(); } }
+function ctxAddToPlaylist() { if (ctxSongId) { openAddToPlaylist(ctxSongId); closeContextMenu(); } }
 function ctxToggleLike() {
   if (ctxSongId) {
     toggleLike(ctxSongId);
     closeContextMenu(); // close immediately after like/unlike
   }
 }
-function ctxViewCredits()  { if (ctxSongId) { openSongDetail(ctxSongId); closeContextMenu(); } }
-function ctxDownload()     { if (ctxSongId) { downloadSong(ctxSongId); closeContextMenu(); } }
+function ctxViewCredits() { if (ctxSongId) { openSongDetail(ctxSongId); closeContextMenu(); } }
+function ctxDownload() { if (ctxSongId) { downloadSong(ctxSongId); closeContextMenu(); } }
 
 // Play Next — insert right after current song
 function playNext(id) {
@@ -641,13 +640,13 @@ function loadAndPlay() {
   resolveAudioSrc(song).then(src => {
     audio.src = src;
     audio.loop = loopMode === 'single';
-    audio.play().catch(() => {});
+    audio.play().catch(() => { });
     isPlaying = true;
     updateNowPlayingUI(song);
     renderQueue();
     try {
       localStorage.setItem('melodiaLastPlayed', JSON.stringify({ songId: song._id, time: 0 }));
-    } catch(e) {}
+    } catch (e) { }
   });
 }
 
@@ -655,7 +654,7 @@ function togglePlayPause() {
   if (requireLogin()) return;
   if (!currentQueue[currentSongIndex]) return;
   if (isPlaying) { audio.pause(); isPlaying = false; }
-  else           { audio.play();  isPlaying = true;  }
+  else { audio.play(); isPlaying = true; }
   updateFsPlayPauseIcon();
 }
 function prevSong() { if (requireLogin()) return; if (currentSongIndex > 0) { currentSongIndex--; loadAndPlay(); } }
@@ -695,11 +694,11 @@ audio.addEventListener('timeupdate', () => {
   if ('mediaSession' in navigator && navigator.mediaSession.setPositionState && audio.duration) {
     try {
       navigator.mediaSession.setPositionState({
-        duration:     audio.duration,
+        duration: audio.duration,
         playbackRate: audio.playbackRate,
-        position:     audio.currentTime,
+        position: audio.currentTime,
       });
-    } catch(e) {}
+    } catch (e) { }
   }
 });
 audio.addEventListener('ended', () => {
@@ -726,7 +725,7 @@ audio.addEventListener('ended', () => {
     }
   }
 });
-audio.addEventListener('play',  () => {
+audio.addEventListener('play', () => {
   isPlaying = true;
   updateFsPlayPauseIcon();
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
@@ -744,7 +743,7 @@ audio.addEventListener('timeupdate', () => {
         songId: currentQueue[currentSongIndex]._id,
         time: Math.floor(audio.currentTime)
       }));
-    } catch(e) {}
+    } catch (e) { }
   }
 });
 
@@ -758,7 +757,7 @@ function buildCreditsText(song) {
     (val || '').split(',').map(s => s.trim()).filter(Boolean);
 
   const directors = splitField(song.musicDirector);
-  const singers   = splitField(song.singer);
+  const singers = splitField(song.singer);
   const lyricists = splitField(song.genre); // genre field stores lyricist name
 
   const seen = new Set();
@@ -796,22 +795,22 @@ function updateNowPlayingUI(song) {
       : [];
 
     navigator.mediaSession.metadata = new MediaMetadata({
-      title:  song.songName  || 'Unknown Song',
+      title: song.songName || 'Unknown Song',
       artist: buildCreditsText(song),
-      album:  song.movieName || '',
+      album: song.movieName || '',
       artwork,
     });
 
     // Hardware button handlers (earphones, lock screen, Bluetooth)
-    navigator.mediaSession.setActionHandler('play',         () => { audio.play(); isPlaying = true; updateFsPlayPauseIcon(); });
-    navigator.mediaSession.setActionHandler('pause',        () => { audio.pause(); isPlaying = false; updateFsPlayPauseIcon(); });
-    navigator.mediaSession.setActionHandler('previoustrack',() => prevSong());
-    navigator.mediaSession.setActionHandler('nexttrack',    () => nextSong());
+    navigator.mediaSession.setActionHandler('play', () => { audio.play(); isPlaying = true; updateFsPlayPauseIcon(); });
+    navigator.mediaSession.setActionHandler('pause', () => { audio.pause(); isPlaying = false; updateFsPlayPauseIcon(); });
+    navigator.mediaSession.setActionHandler('previoustrack', () => prevSong());
+    navigator.mediaSession.setActionHandler('nexttrack', () => nextSong());
     navigator.mediaSession.setActionHandler('seekto', e => {
       if (e.seekTime !== undefined) audio.currentTime = e.seekTime;
     });
     // Seek forward/backward (some earphones send these)
-    navigator.mediaSession.setActionHandler('seekforward',  () => { audio.currentTime = Math.min(audio.currentTime + 10, audio.duration || 0); });
+    navigator.mediaSession.setActionHandler('seekforward', () => { audio.currentTime = Math.min(audio.currentTime + 10, audio.duration || 0); });
     navigator.mediaSession.setActionHandler('seekbackward', () => { audio.currentTime = Math.max(audio.currentTime - 10, 0); });
   }
 
@@ -880,16 +879,15 @@ function updateNowPlayingUI(song) {
     fsCoverPh.style.display = 'flex';
   }
 
-  // Marquee: Music Director, unique Singers, unique Lyricists (no duplicates)
-  // Only scroll if the text is longer than the container; otherwise display statically.
+  // Scroll only if text overflows container
   const marqueeText = buildCreditsText(song);
   const marqueeEl = document.getElementById('npfsMarquee');
   const marqueeWrap = marqueeEl.parentElement;
   marqueeWrap.classList.remove('npfs-marquee-scroll');
   marqueeEl.textContent = marqueeText; // render plain first to measure
   setTimeout(() => {
-    if (marqueeEl.scrollWidth > marqueeWrap.clientWidth + 2) {
-      // Text overflows — enable scrolling with doubled content and wide gap
+    const overflows = marqueeEl.scrollWidth > marqueeWrap.clientWidth + 2;
+    if (overflows) {
       const sep = '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0';
       marqueeEl.textContent = `${marqueeText}${sep}${marqueeText}`;
       marqueeWrap.classList.add('npfs-marquee-scroll');
@@ -898,7 +896,7 @@ function updateNowPlayingUI(song) {
       void marqueeEl.offsetWidth;
       marqueeEl.style.animation = '';
     }
-    // else: no class = no animation, text shows statically
+    // else: single artist, no overflow — show statically
   }, 100);
 
   document.getElementById('npfsLikeBtn').textContent = likeEmoji;
@@ -961,14 +959,15 @@ function openNowPlayingScreen() {
     });
 
     // --- Marquee (artist credits) ---
-    const marqueeEl  = document.getElementById('npfsMarquee');
+    const marqueeEl = document.getElementById('npfsMarquee');
     const marqueeWrap = marqueeEl.parentElement;
     const marqueeText = buildCreditsText(song);
     // Reset to plain text first so scrollWidth is accurate
     marqueeWrap.classList.remove('npfs-marquee-scroll');
     marqueeEl.textContent = marqueeText;
     requestAnimationFrame(() => {
-      if (marqueeEl.scrollWidth > marqueeWrap.clientWidth + 2) {
+      const overflows = marqueeEl.scrollWidth > marqueeWrap.clientWidth + 2;
+      if (overflows) {
         const sep = '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0';
         marqueeEl.textContent = `${marqueeText}${sep}${marqueeText}`;
         marqueeWrap.classList.add('npfs-marquee-scroll');
@@ -977,7 +976,7 @@ function openNowPlayingScreen() {
         void marqueeEl.offsetWidth;
         marqueeEl.style.animation = '';
       }
-      // else: no class = no animation, text shows statically
+      // else: single artist, no overflow — show statically
     });
   }, 80);
 }
@@ -1007,14 +1006,14 @@ function updateFsPlayPauseIcon() {
   // Sync fullscreen shuffle/loop active states
   const fsShuffleBtn = document.getElementById('npfsShuffleBtn');
   if (fsShuffleBtn) fsShuffleBtn.classList.toggle('active', isShuffle);
-  const fsLoopBtn   = document.getElementById('npfsLoopBtn');
+  const fsLoopBtn = document.getElementById('npfsLoopBtn');
   const fsLoopBadge = document.getElementById('npfsLoopBadge');
-  if (fsLoopBtn)   fsLoopBtn.classList.toggle('active', loopMode !== 'none');
+  if (fsLoopBtn) fsLoopBtn.classList.toggle('active', loopMode !== 'none');
   if (fsLoopBadge) fsLoopBadge.classList.toggle('hidden', loopMode !== 'single');
   // Desktop loop
-  const loopBtn   = document.getElementById('loopBtn');
+  const loopBtn = document.getElementById('loopBtn');
   const loopBadge = document.getElementById('loopBadge');
-  if (loopBtn)   loopBtn.classList.toggle('active', loopMode !== 'none');
+  if (loopBtn) loopBtn.classList.toggle('active', loopMode !== 'none');
   if (loopBadge) loopBadge.classList.toggle('hidden', loopMode !== 'single');
   // Desktop queue active
   const qDesktop = document.getElementById('queueDesktopBtn');
@@ -1027,12 +1026,12 @@ function updateFsPlayPauseIcon() {
 function updateFsProgress() {
   if (!audio.duration) return;
   const pct = (audio.currentTime / audio.duration) * 100;
-  const fill  = document.getElementById('npfsProgressFill');
+  const fill = document.getElementById('npfsProgressFill');
   const thumb = document.getElementById('npfsProgressThumb');
-  if (fill)  fill.style.width  = pct + '%';
-  if (thumb) thumb.style.left  = pct + '%';
+  if (fill) fill.style.width = pct + '%';
+  if (thumb) thumb.style.left = pct + '%';
   document.getElementById('npfsCurrentTime').textContent = fmtTime(audio.currentTime);
-  document.getElementById('npfsTotalTime').textContent   = fmtTime(audio.duration);
+  document.getElementById('npfsTotalTime').textContent = fmtTime(audio.duration);
 }
 function fmtTime(s) {
   if (!s || isNaN(s)) return '0:00';
@@ -1047,7 +1046,7 @@ function toggleShuffle() {
     originalQueue = [...currentQueue];
     const current = currentQueue[currentSongIndex];
     const rest = currentQueue.filter((_, i) => i !== currentSongIndex);
-    for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
+    for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[rest[i], rest[j]] = [rest[j], rest[i]]; }
     currentQueue = [current, ...rest]; currentSongIndex = 0;
   } else {
     if (originalQueue.length) {
@@ -1094,7 +1093,7 @@ function addToQueue(id) {
 // ===== DESKTOP LYRICS PANEL =====
 function toggleLyricsPanel() {
   const panel = document.getElementById('lyricsPanel');
-  const btn   = document.getElementById('lyricsBtn');
+  const btn = document.getElementById('lyricsBtn');
   const isOpen = !panel.classList.contains('hidden');
   panel.classList.toggle('hidden');
   btn?.classList.toggle('active', !isOpen);
@@ -1108,24 +1107,24 @@ function toggleLyricsPanel() {
 
 function updateLyricsPanel() {
   const song = currentQueue[currentSongIndex];
-  const titleEl  = document.getElementById('lyricsPanelTitle');
+  const titleEl = document.getElementById('lyricsPanelTitle');
   const artistEl = document.getElementById('lyricsPanelArtist');
-  const textEl   = document.getElementById('lyricsPanelText');
-  const emptyEl  = document.getElementById('lyricsPanelEmpty');
+  const textEl = document.getElementById('lyricsPanelText');
+  const emptyEl = document.getElementById('lyricsPanelEmpty');
   if (!song) {
-    if (titleEl)  titleEl.textContent  = '—';
+    if (titleEl) titleEl.textContent = '—';
     if (artistEl) artistEl.textContent = '—';
-    if (textEl)   textEl.textContent   = '';
-    if (emptyEl)  emptyEl.style.display = 'flex';
+    if (textEl) textEl.textContent = '';
+    if (emptyEl) emptyEl.style.display = 'flex';
     return;
   }
-  if (titleEl)  titleEl.textContent  = song.songName;
+  if (titleEl) titleEl.textContent = song.songName;
   if (artistEl) artistEl.textContent = buildCreditsText(song);
   if (song.lyrics && song.lyrics.trim()) {
-    if (textEl)  { textEl.textContent = song.lyrics; textEl.style.display = 'block'; }
+    if (textEl) { textEl.textContent = song.lyrics; textEl.style.display = 'block'; }
     if (emptyEl) emptyEl.style.display = 'none';
   } else {
-    if (textEl)  { textEl.textContent = ''; textEl.style.display = 'none'; }
+    if (textEl) { textEl.textContent = ''; textEl.style.display = 'none'; }
     if (emptyEl) emptyEl.style.display = 'flex';
   }
 }
@@ -1136,7 +1135,7 @@ function toggleQueue() {
   const isOpen = panel.classList.contains('hidden');
   panel.classList.toggle('hidden');
   // Sync active state on both possible queue buttons
-  ['queueBtn','queueDesktopBtn'].forEach(id => {
+  ['queueBtn', 'queueDesktopBtn'].forEach(id => {
     document.getElementById(id)?.classList.toggle('active', isOpen);
   });
   // Mobile backdrop
@@ -1186,7 +1185,7 @@ function renderFsQueue() {
       ${current.coverUrl ? `<img class="npfs-queue-cover" src="${current.coverUrl}" alt="" />` : `<div class="npfs-queue-cover-ph">🎵</div>`}
       <div class="npfs-queue-meta">
         <div class="npfs-queue-title">${esc(current.songName)}</div>
-        <div class="npfs-queue-artist">${esc(current.singer || current.musicDirector || '')}</div>
+        <div class="npfs-queue-artist">${esc(buildCreditsText(current))}</div>
       </div>
       <span class="npfs-queue-now-badge">▶ NOW</span>
     </div>`);
@@ -1199,7 +1198,7 @@ function renderFsQueue() {
       ${s.coverUrl ? `<img class="npfs-queue-cover" src="${s.coverUrl}" alt="" />` : `<div class="npfs-queue-cover-ph">🎵</div>`}
       <div class="npfs-queue-meta">
         <div class="npfs-queue-title">${esc(s.songName)}</div>
-        <div class="npfs-queue-artist">${esc(s.singer || s.musicDirector || '')}</div>
+        <div class="npfs-queue-artist">${esc(buildCreditsText(s))}</div>
       </div>
     </div>`);
   });
@@ -1373,7 +1372,7 @@ function openPlaylistContextMenu(e, id, anchorEl) {
   document.getElementById('pctxTitle').textContent = pl.name;
   document.getElementById('pctxCount').textContent = `${pl.songs.length} song${pl.songs.length !== 1 ? 's' : ''}`;
 
-  const menu   = document.getElementById('playlistContextMenu');
+  const menu = document.getElementById('playlistContextMenu');
   const backdrop = document.getElementById('ctxBackdrop');
   // Close song context menu if open
   document.getElementById('songContextMenu')?.classList.add('hidden');
@@ -1384,10 +1383,10 @@ function openPlaylistContextMenu(e, id, anchorEl) {
     // Desktop right-click
     const menuW = 240, menuH = 180;
     let x = e.clientX, y = e.clientY;
-    if (x + menuW > window.innerWidth)  x = window.innerWidth - menuW - 8;
+    if (x + menuW > window.innerWidth) x = window.innerWidth - menuW - 8;
     if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8;
     menu.style.left = x + 'px';
-    menu.style.top  = y + 'px';
+    menu.style.top = y + 'px';
     menu.style.bottom = 'auto';
     menu.style.transform = 'none';
     menu.style.borderRadius = '14px';
@@ -1525,7 +1524,13 @@ function fuzzyMatch(str, q) {
   if (s.includes(t) || t.includes(s)) return true;
   // Space-normalized match (e.g. "TheRajaSaab" matches "The Raja Saab")
   const sn = normalizeStr(s), tn = normalizeStr(t);
-  return sn.includes(tn) || tn.includes(sn);
+  if (sn === tn) return true;
+  // Prevent aggressive bridging across boundaries for short acronym-like queries
+  // (e.g., stopping "ntr" from matching "Silambarasan TR" -> "silambarasantr")
+  if (tn.length > 3) {
+    return sn.includes(tn) || tn.includes(sn);
+  }
+  return false;
 }
 
 // Similarity score (0–1): how well the entity value covers the query
@@ -1571,8 +1576,8 @@ function liveSearch(query) {
   // Broad match: find any song touching this query across all fields
   const broadResults = allSongs.filter(s => {
     const fields = [s.songName, s.movieName, s.singer, s.musicDirector,
-                    s.movieDirector, s.cast, s.label, s.genre,
-                    s.song_category, s.song_language];
+    s.movieDirector, s.cast, s.label, s.genre,
+    s.song_category, s.song_language];
     return fields.some(f => fuzzyMatch(f || '', coreQuery));
   });
 
@@ -1584,14 +1589,14 @@ function liveSearch(query) {
   // This prevents a short category name like "Love" from beating a specific
   // movie name like "Love Insurance Kompany" for the query "love insurance kompany".
   const checks = [
-    { field: 'movieName',      label: 'Movie Album',     icon: '🎬' },
-    { field: 'singer',         label: 'Singer',          icon: '👤' },
-    { field: 'musicDirector',  label: 'Music Director',  icon: '👤' },
-    { field: 'cast',           label: 'Actor / Actress', icon: '👤' },
-    { field: 'movieDirector',  label: 'Movie Director',  icon: '👤' },
-    { field: 'genre',          label: 'Lyricist',        icon: '👤' },
-    { field: 'song_category',  label: 'Category',        icon: '🎵' },
-    { field: 'song_language',  label: 'Language',        icon: '🎵' },
+    { field: 'movieName', label: 'Movie Album', icon: '🎬' },
+    { field: 'singer', label: 'Artist', icon: '👤' },
+    { field: 'musicDirector', label: 'Artist', icon: '👤' },
+    { field: 'cast', label: 'Artist', icon: '👤' },
+    { field: 'movieDirector', label: 'Artist', icon: '👤' },
+    { field: 'genre', label: 'Artist', icon: '👤' },
+    { field: 'song_category', label: 'Category', icon: '🎵' },
+    { field: 'song_language', label: 'Language', icon: '🎵' },
   ];
 
   let bestVal = null, bestScore = 0, bestField = null, bestLabel = null, bestIcon = null;
@@ -1617,10 +1622,10 @@ function liveSearch(query) {
         const { matched } = scoreEntity(allSongs, field, val);
         if (matched.length >= 1) {
           bestScore = tieScore;
-          bestVal   = val;
+          bestVal = val;
           bestField = field;
           bestLabel = label;
-          bestIcon  = icon;
+          bestIcon = icon;
         }
       }
     }
@@ -1763,15 +1768,15 @@ function showGroupedResults(raw, results) {
   const grouped = document.getElementById('searchGrouped');
   grouped.innerHTML = '';
 
-  const byMovie    = groupBy(results, 'movieName');
+  const byMovie = groupBy(results, 'movieName');
   const byDirector = groupBy(results, 'musicDirector');
-  const bySinger   = groupByMulti(results, 'singer');
+  const bySinger = groupByMulti(results, 'singer');
   const byLyricist = groupBy(results, 'genre'); // genre = lyricist
 
-  const multiMovies   = Object.entries(byMovie).filter(([,s]) => s.length >= 2);
-  const multiMD       = Object.entries(byDirector).filter(([,s]) => s.length >= 2);
-  const multiSinger   = Object.entries(bySinger).filter(([,s]) => s.length >= 2);
-  const multiLyricist = Object.entries(byLyricist).filter(([,s]) => s.length >= 2);
+  const multiMovies = Object.entries(byMovie).filter(([, s]) => s.length >= 2);
+  const multiMD = Object.entries(byDirector).filter(([, s]) => s.length >= 2);
+  const multiSinger = Object.entries(bySinger).filter(([, s]) => s.length >= 2);
+  const multiLyricist = Object.entries(byLyricist).filter(([, s]) => s.length >= 2);
 
   if (multiMovies.length) {
     grouped.appendChild(makeGroupSection('🎬 Movies', multiMovies.map(([name, songs]) =>
@@ -1897,7 +1902,7 @@ function showSectionInternal(name) {
   localStorage.setItem('melodiaSection', name);
   document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
   document.getElementById('searchResultsSection').classList.add('hidden');
-  ['navLiked','navDownloads','navPlaylists','navAccount'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+  ['navLiked', 'navDownloads', 'navPlaylists', 'navAccount'].forEach(id => document.getElementById(id)?.classList.remove('active'));
   const navMap = { liked: 'navLiked', downloads: 'navDownloads', playlists: 'navPlaylists', account: 'navAccount' };
   if (navMap[name]) document.getElementById(navMap[name])?.classList.add('active');
   const map = { home: 'homeSection', search: 'homeSection', liked: 'likedSection', downloads: 'downloadsSection', playlists: 'playlistsSection', account: 'accountSection' };
@@ -1931,7 +1936,7 @@ function openSongDetail(id) {
     ['Lyricist', song.genre], ['Movie Director', song.movieDirector],
     ['Label', song.label], ['Year', song.year]
   ];
-  document.getElementById('sdTable').innerHTML = fields.filter(([,v]) => v).map(([k,v]) => `<tr><td>${k}</td><td>${esc(String(v))}</td></tr>`).join('');
+  document.getElementById('sdTable').innerHTML = fields.filter(([, v]) => v).map(([k, v]) => `<tr><td>${k}</td><td>${esc(String(v))}</td></tr>`).join('');
   document.getElementById('songDetailModal').classList.remove('hidden');
 }
 function closeSongDetail() { document.getElementById('songDetailModal').classList.add('hidden'); currentDetailSongId = null; }
@@ -1977,7 +1982,7 @@ async function changeDisplayName() {
 async function changePassword() {
   if (currentUser.isGuest) return showMsg('passwordChangeMsg', 'Please login first!');
   const current = document.getElementById('currentPassword').value;
-  const newPwd  = document.getElementById('newPassword').value;
+  const newPwd = document.getElementById('newPassword').value;
   const confirm = document.getElementById('confirmNewPassword').value;
   if (!current || !newPwd || !confirm) return showMsg('passwordChangeMsg', 'Please fill all fields.');
   if (newPwd.length < 6) return showMsg('passwordChangeMsg', 'Min 6 characters required.');
@@ -1995,10 +2000,10 @@ async function changePassword() {
     user.password = newPwd; localStorage.setItem('rhythmUsers', JSON.stringify(users));
     showMsg('passwordChangeMsg', '✅ Password updated!');
   }
-  ['currentPassword','newPassword','confirmNewPassword'].forEach(id => document.getElementById(id).value = '');
+  ['currentPassword', 'newPassword', 'confirmNewPassword'].forEach(id => document.getElementById(id).value = '');
   // Uncheck show password checkbox
   const cb = document.querySelector('input[onchange*="currentPassword"]');
-  if (cb) { cb.checked = false; togglePwdGroup(['currentPassword','newPassword','confirmNewPassword'], cb); }
+  if (cb) { cb.checked = false; togglePwdGroup(['currentPassword', 'newPassword', 'confirmNewPassword'], cb); }
   setTimeout(() => showMsg('passwordChangeMsg', ''), 4000);
 }
 
@@ -2027,7 +2032,7 @@ function closeConfirm() {
 }
 
 // ===== SPACEBAR =====
-document.addEventListener('keydown', function(e) {
+document.addEventListener('keydown', function (e) {
   const tag = document.activeElement?.tagName?.toLowerCase();
   if (tag === 'input' || tag === 'textarea') return;
   if (e.code === 'Space' && currentQueue[currentSongIndex]) { e.preventDefault(); togglePlayPause(); }
@@ -2060,7 +2065,7 @@ function focusMobileSearch() {
 }
 function esc(str) {
   if (!str) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // ===================================================================
@@ -2157,7 +2162,7 @@ async function downloadSong(songId) {
 
     let coverBlob = null;
     if (song.coverUrl) {
-      try { const r = await fetch(song.coverUrl); if (r.ok) coverBlob = await r.blob(); } catch {}
+      try { const r = await fetch(song.coverUrl); if (r.ok) coverBlob = await r.blob(); } catch { }
     }
 
     const metadata = {
@@ -2220,7 +2225,7 @@ async function syncDownloadsFromCloud() {
         const audioBlob = await audioRes.blob();
         let coverBlob = null;
         if (song.coverUrl) {
-          try { const r = await fetch(song.coverUrl); if (r.ok) coverBlob = await r.blob(); } catch {}
+          try { const r = await fetch(song.coverUrl); if (r.ok) coverBlob = await r.blob(); } catch { }
         }
         const metadata = {
           _id: song._id, songName: song.songName, movieName: song.movieName,
@@ -2230,7 +2235,7 @@ async function syncDownloadsFromCloud() {
           cast: song.cast, coverBlob,
         };
         await saveDownload(songId, audioBlob, metadata);
-      } catch {}
+      } catch { }
     }
     showToast(`✅ Downloads synced!`);
     if (currentSection === 'downloads') renderDownloadsSection();
@@ -2311,13 +2316,13 @@ async function resolveAudioSrc(song) {
 // ===== END DOWNLOADS =====
 
 // Close modals on overlay click
-['createPlaylistModal','renamePlaylistModal','addToPlaylistModal','songDetailModal','confirmModal'].forEach(id => {
+['createPlaylistModal', 'renamePlaylistModal', 'addToPlaylistModal', 'songDetailModal', 'confirmModal'].forEach(id => {
   const el = document.getElementById(id);
-  if (el) el.addEventListener('click', function(e) { if (e.target === this) this.classList.add('hidden'); });
+  if (el) el.addEventListener('click', function (e) { if (e.target === this) this.classList.add('hidden'); });
 });
 const authModalEl = document.getElementById('authModal');
 if (authModalEl) {
-  authModalEl.addEventListener('click', function(e) {
+  authModalEl.addEventListener('click', function (e) {
     if (e.target === this && currentUser?.isGuest) { this.classList.add('hidden'); this.classList.remove('active'); }
   });
 }
