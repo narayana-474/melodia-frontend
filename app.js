@@ -510,7 +510,7 @@ function openContextMenu(e, songId, anchorEl) {
   document.getElementById('ctxTitle').textContent = song.songName;
   document.getElementById('ctxArtist').textContent = buildCreditsText(song);
   document.getElementById('ctxLikeText').textContent = isLiked(songId) ? 'Remove from Liked Songs' : 'Add to Liked Songs';
-  document.getElementById('ctxLikeBtn').style.color = isLiked(songId) ? 'var(--accent)' : '';
+  document.getElementById('ctxLikeBtn').classList.toggle('liked', isLiked(songId));
   // Update download button state
   isDownloaded(songId).then(dl => {
     const btn = document.getElementById('ctxDownloadBtn');
@@ -845,10 +845,6 @@ function updateNowPlayingUI(song) {
   const cover = document.getElementById('npCover');
   cover.src = song.coverUrl || ''; cover.style.display = song.coverUrl ? 'block' : 'none';
 
-  // Like button sync
-  const likeEmoji = isLiked(song._id) ? '❤️' : '🤍';
-  const npLike = document.getElementById('npLikeBtn');
-  if (npLike) npLike.textContent = likeEmoji;
   // Desktop like button
   const npDesktopLike = document.getElementById('npDesktopLikeBtn');
   if (npDesktopLike) npDesktopLike.classList.toggle('liked', isLiked(song._id));
@@ -881,25 +877,26 @@ function updateNowPlayingUI(song) {
 
   // Scroll only if text overflows container
   const marqueeText = buildCreditsText(song);
-  const marqueeEl = document.getElementById('npfsMarquee');
+  let marqueeEl = document.getElementById('npfsMarquee');
   const marqueeWrap = marqueeEl.parentElement;
   marqueeWrap.classList.remove('npfs-marquee-scroll');
-  marqueeEl.textContent = marqueeText; // render plain first to measure
+  // Recreate the element to bust animation cache for accurate measuring
+  marqueeWrap.innerHTML = `<div class="npfs-marquee" id="npfsMarquee">${esc(marqueeText)}</div>`;
+  marqueeEl = document.getElementById('npfsMarquee');
+  
   setTimeout(() => {
     const overflows = marqueeEl.scrollWidth > marqueeWrap.clientWidth + 2;
     if (overflows) {
       const sep = '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0';
       marqueeEl.textContent = `${marqueeText}${sep}${marqueeText}`;
       marqueeWrap.classList.add('npfs-marquee-scroll');
-      // Restart animation from the beginning
-      marqueeEl.style.animation = 'none';
-      void marqueeEl.offsetWidth;
-      marqueeEl.style.animation = '';
     }
-    // else: single artist, no overflow — show statically
   }, 100);
 
-  document.getElementById('npfsLikeBtn').textContent = likeEmoji;
+  const isL = isLiked(song._id);
+  document.getElementById('npLikeBtn')?.classList.toggle('liked', isL);
+  document.getElementById('npfsLikeBtn')?.classList.toggle('liked', isL);
+  document.getElementById('npDesktopLikeBtn')?.classList.toggle('liked', isL);
 
   // Lyrics
   const lyricsEl = document.getElementById('npfsLyrics');
@@ -959,24 +956,21 @@ function openNowPlayingScreen() {
     });
 
     // --- Marquee (artist credits) ---
-    const marqueeEl = document.getElementById('npfsMarquee');
+    let marqueeEl = document.getElementById('npfsMarquee');
     const marqueeWrap = marqueeEl.parentElement;
     const marqueeText = buildCreditsText(song);
-    // Reset to plain text first so scrollWidth is accurate
     marqueeWrap.classList.remove('npfs-marquee-scroll');
-    marqueeEl.textContent = marqueeText;
+    // Recreate element to force clear bounds cache
+    marqueeWrap.innerHTML = `<div class="npfs-marquee" id="npfsMarquee">${esc(marqueeText)}</div>`;
+    marqueeEl = document.getElementById('npfsMarquee');
+    
     requestAnimationFrame(() => {
       const overflows = marqueeEl.scrollWidth > marqueeWrap.clientWidth + 2;
       if (overflows) {
         const sep = '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0';
         marqueeEl.textContent = `${marqueeText}${sep}${marqueeText}`;
         marqueeWrap.classList.add('npfs-marquee-scroll');
-        // Restart animation from the beginning
-        marqueeEl.style.animation = 'none';
-        void marqueeEl.offsetWidth;
-        marqueeEl.style.animation = '';
       }
-      // else: single artist, no overflow — show statically
     });
   }, 80);
 }
@@ -1251,17 +1245,16 @@ async function toggleLike(id) {
   if (isLiked(id)) likedSongs = likedSongs.filter(i => i !== id); else likedSongs.push(id);
   await saveLikedSongs();
   const liked = isLiked(id);
-  const emoji = liked ? '❤️' : '🤍';
   // Update all song card like buttons
   document.querySelectorAll(`[id="likeBtn-${id}"]`).forEach(btn => {
-    btn.textContent = emoji; btn.classList.toggle('liked', liked);
+    btn.classList.toggle('liked', liked);
   });
   // Sync mini bar like button
   const miniLike = document.getElementById('npLikeBtn');
-  if (miniLike && currentQueue[currentSongIndex]?._id === id) miniLike.textContent = emoji;
+  if (miniLike && currentQueue[currentSongIndex]?._id === id) miniLike.classList.toggle('liked', liked);
   // Sync fullscreen like button
   const fsLike = document.getElementById('npfsLikeBtn');
-  if (fsLike && currentQueue[currentSongIndex]?._id === id) fsLike.textContent = emoji;
+  if (fsLike && currentQueue[currentSongIndex]?._id === id) fsLike.classList.toggle('liked', liked);
   // Sync desktop like button
   const desktopLike = document.getElementById('npDesktopLikeBtn');
   if (desktopLike && currentQueue[currentSongIndex]?._id === id) desktopLike.classList.toggle('liked', liked);
