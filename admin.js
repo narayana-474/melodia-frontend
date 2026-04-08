@@ -1,15 +1,7 @@
 // ===================================================================
 // MELODIA — ADMIN PANEL JavaScript
 // ===================================================================
-// ── Auto-detect backend URL ──────────────────────────────────────────
-// • On localhost → use local Node server
-// • On any deployed domain → use your Render/Railway/etc. backend URL
-//   👇 Replace this with your actual deployed backend URL
-const DEPLOYED_BACKEND_URL = 'https://melodia-backend-5f8g.onrender.com/api';
-
-const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? 'http://localhost:5000/api'
-  : DEPLOYED_BACKEND_URL;
+const API_BASE_URL = 'https://melodia-backend-5f8g.onrender.com/api';
 // ===================================================================
 
 let adminToken = null;
@@ -49,20 +41,6 @@ function adminErr(msg) {
   setTimeout(() => el.textContent = '', 5000);
 }
 
-// Auto-logout when token has expired
-function handleAuthError(status) {
-  if (status === 401 || status === 403) {
-    showAdminToast('⚠️ Session expired. Please log in again.');
-    setTimeout(() => {
-      adminToken = null;
-      localStorage.removeItem('rhythmAdminToken');
-      location.reload();
-    }, 1500);
-    return true;
-  }
-  return false;
-}
-
 function adminLogout() {
   adminToken = null;
   localStorage.removeItem('rhythmAdminToken');
@@ -93,7 +71,7 @@ function adminSection(name) {
   document.getElementById(map[name])?.classList.remove('hidden');
   event?.target?.closest('.nav-link')?.classList.add('active');
   if (name === 'manage') renderAdminSongsTable(allAdminSongs);
-  if (name === 'users') loadAdminUsers();
+  if (name === 'users')  loadAdminUsers();
 }
 
 // ===== UPLOAD SONG =====
@@ -135,8 +113,6 @@ async function uploadSong() {
     formData.append('lyrics', document.getElementById('uLyrics').value.trim());
     formData.append('genre', document.getElementById('uGenre').value.trim());
     formData.append('year', document.getElementById('uYear').value);
-    formData.append('song_category', document.getElementById('uCategory').value.trim());
-    formData.append('song_language', document.getElementById('uLanguage').value.trim());
     if (coverFile) formData.append('cover', coverFile);
     if (audioFile) formData.append('audio', audioFile);
     const res = await fetch(`${API_BASE_URL}/songs`, {
@@ -160,8 +136,6 @@ async function uploadSong() {
       lyrics: document.getElementById('uLyrics').value.trim(),
       genre: document.getElementById('uGenre').value.trim(),
       year: document.getElementById('uYear').value,
-      song_category: document.getElementById('uCategory').value.trim(),
-      song_language: document.getElementById('uLanguage').value.trim(),
       coverUrl, audioUrl, createdAt: new Date().toISOString()
     };
     songs.push(newSong);
@@ -192,11 +166,9 @@ function showUploadStatus(type, msg) {
 }
 
 function clearUploadForm() {
-  ['uSongName', 'uMovieName', 'uCast', 'uSinger', 'uMusicDirector', 'uMovieDirector', 'uLabel', 'uLyrics', 'uYear', 'uGenre'].forEach(id => {
+  ['uSongName','uMovieName','uCast','uSinger','uMusicDirector','uMovieDirector','uLabel','uLyrics','uYear','uGenre'].forEach(id => {
     document.getElementById(id).value = '';
   });
-  document.getElementById('uCategory').value = '';
-  document.getElementById('uLanguage').value = '';
   document.getElementById('coverFile').value = '';
   document.getElementById('audioFile').value = '';
   document.getElementById('coverPreview').classList.remove('hidden');
@@ -206,14 +178,7 @@ function clearUploadForm() {
 }
 
 // ===== MANAGE SONGS =====
-function normalizeSong(s) {
-  return {
-    ...s,
-    cast_members: s.cast_members || s.cast || '',
-    song_category: s.song_category || '',
-    song_language: s.song_language || '',
-  };
-}
+function normalizeSong(s) { return { ...s, cast_members: s.cast_members || s.cast || '' }; }
 
 async function loadAdminSongs() {
   try {
@@ -267,8 +232,6 @@ function openEditModal(id) {
   document.getElementById('editLabel').value = song.label || '';
   document.getElementById('editGenre').value = song.genre || '';
   document.getElementById('editYear').value = song.year || '';
-  document.getElementById('editCategory').value = song.song_category || '';
-  document.getElementById('editLanguage').value = song.song_language || '';
   document.getElementById('editLyrics').value = song.lyrics || '';
   document.getElementById('editSongModal').classList.remove('hidden');
 }
@@ -288,41 +251,22 @@ async function saveEditSong() {
     label: document.getElementById('editLabel').value.trim(),
     genre: document.getElementById('editGenre').value.trim(),
     year: document.getElementById('editYear').value,
-    song_category: document.getElementById('editCategory').value.trim(),
-    song_language: document.getElementById('editLanguage').value.trim(),
     lyrics: document.getElementById('editLyrics').value.trim(),
   };
   try {
     const res = await fetch(`${API_BASE_URL}/songs/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
       body: JSON.stringify(updated)
     });
-    const data = await res.json();
-    if (!res.ok) {
-      // Auto-logout on expired token (401)
-      if (handleAuthError(res.status)) { closeEditModal(); return; }
-      showAdminToast(`❌ Error: ${data.message || 'Update failed. Check Supabase columns exist.'}`);
-      console.error('saveEditSong API error:', data.message);
-      closeEditModal();
-      return;
-    }
+    if (!res.ok) throw new Error();
     showAdminToast('✅ Song updated successfully!');
-    closeEditModal();
-    loadAdminSongs();
-  } catch (e) {
-    // Network error — server unreachable, use localStorage fallback
-    console.warn('saveEditSong network error, using localStorage:', e.message);
+  } catch {
     const songs = JSON.parse(localStorage.getItem('rhythmSongs') || '[]');
     const idx = songs.findIndex(s => s._id === id);
-    if (idx !== -1) {
-      songs[idx] = { ...songs[idx], ...updated };
-      localStorage.setItem('rhythmSongs', JSON.stringify(songs));
-    }
-    showAdminToast('⚠️ Server unreachable — saved locally (demo mode).');
-    closeEditModal();
-    loadAdminSongs();
+    if (idx !== -1) { songs[idx] = { ...songs[idx], ...updated }; localStorage.setItem('rhythmSongs', JSON.stringify(songs)); }
+    showAdminToast('✅ Song updated (demo mode)!');
   }
+  closeEditModal(); loadAdminSongs();
 }
 
 async function deleteSong(id) {
@@ -368,11 +312,11 @@ function renderUsersTable(users) {
   tbody.innerHTML = users.map(u => {
     const uid = u.id || u._id;
     const joinedDate = u.created_at || u.createdAt;
-    const dateStr = joinedDate ? new Date(joinedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+    const dateStr = joinedDate ? new Date(joinedDate).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '—';
     const likedArr = Array.isArray(u.liked_songs) ? u.liked_songs : JSON.parse(localStorage.getItem(`liked_${uid}`) || '[]');
     const playlistArr = Array.isArray(u.playlists) ? u.playlists : JSON.parse(localStorage.getItem(`playlists_${uid}`) || '[]');
     return `<tr>
-      <td><div style="display:flex;align-items:center;gap:10px;"><span class="user-avatar">${(u.name || '?')[0].toUpperCase()}</span><span style="font-weight:600;color:#f0f0f5;">${esc(u.name)}</span></div></td>
+      <td><div style="display:flex;align-items:center;gap:10px;"><span class="user-avatar">${(u.name||'?')[0].toUpperCase()}</span><span style="font-weight:600;color:#f0f0f5;">${esc(u.name)}</span></div></td>
       <td style="color:#888899;">${esc(u.email)}</td>
       <td style="color:#888899;font-size:13px;">${dateStr}</td>
       <td style="color:#ff8fa3;font-weight:600;">${likedArr.length}</td>
@@ -406,11 +350,11 @@ function updateAdminStats() {
 function viewUserDetail(uid) {
   const user = allAdminUsers.find(u => (u.id || u._id) === uid); if (!user) return;
   currentViewUserId = uid;
-  document.getElementById('udAvatar').textContent = (user.name || '?')[0].toUpperCase();
+  document.getElementById('udAvatar').textContent = (user.name||'?')[0].toUpperCase();
   document.getElementById('udName').textContent = user.name;
   document.getElementById('udEmail').textContent = user.email;
   const joinedDate = user.created_at || user.createdAt;
-  document.getElementById('udJoined').textContent = joinedDate ? `Joined: ${new Date(joinedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}` : '';
+  document.getElementById('udJoined').textContent = joinedDate ? `Joined: ${new Date(joinedDate).toLocaleDateString('en-IN', { day:'2-digit', month:'long', year:'numeric' })}` : '';
   const likedArr = Array.isArray(user.liked_songs) ? user.liked_songs : JSON.parse(localStorage.getItem(`liked_${uid}`) || '[]');
   const playlistArr = Array.isArray(user.playlists) ? user.playlists : JSON.parse(localStorage.getItem(`playlists_${uid}`) || '[]');
   document.getElementById('udLiked').textContent = likedArr.length;
@@ -422,7 +366,7 @@ function closeUserDetail() { document.getElementById('userDetailModal').classLis
 
 async function adminDeleteUser(uid) {
   closeUserDetail();
-  confirmAdminDelete('user', uid, allAdminUsers.find(u => (u.id || u._id) === uid)?.name || 'this user');
+  confirmAdminDelete('user', uid, allAdminUsers.find(u => (u.id||u._id) === uid)?.name || 'this user');
 }
 
 function confirmAdminDelete(type, id, name) {
@@ -447,7 +391,7 @@ async function deleteUserById(uid) {
     await fetch(`${API_BASE_URL}/users/${uid}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${adminToken}` } });
   } catch {
     const users = JSON.parse(localStorage.getItem('rhythmUsers') || '[]');
-    localStorage.setItem('rhythmUsers', JSON.stringify(users.filter(u => (u.id || u._id) !== uid)));
+    localStorage.setItem('rhythmUsers', JSON.stringify(users.filter(u => (u.id||u._id) !== uid)));
     localStorage.removeItem(`liked_${uid}`);
     localStorage.removeItem(`playlists_${uid}`);
   }
@@ -457,9 +401,9 @@ async function deleteUserById(uid) {
 // ===== SETTINGS — CHANGE ADMIN CREDENTIALS =====
 async function changeAdminEmail() {
   const currentEmail = document.getElementById('currentAdminEmail').value.trim();
-  const newEmail = document.getElementById('newAdminEmail').value.trim();
-  const password = document.getElementById('emailChangePassword').value;
-  const msgEl = document.getElementById('emailChangeMsg');
+  const newEmail     = document.getElementById('newAdminEmail').value.trim();
+  const password     = document.getElementById('emailChangePassword').value;
+  const msgEl        = document.getElementById('emailChangeMsg');
 
   if (!currentEmail || !newEmail || !password) {
     return showSettingsMsg('emailChangeMsg', '❌ Please fill all fields.', 'error');
@@ -487,7 +431,7 @@ async function changeAdminEmail() {
 
 async function changeAdminPassword() {
   const currentPwd = document.getElementById('currentAdminPassword').value;
-  const newPwd = document.getElementById('newAdminPassword').value;
+  const newPwd     = document.getElementById('newAdminPassword').value;
   const confirmPwd = document.getElementById('confirmAdminPassword').value;
 
   if (!currentPwd || !newPwd || !confirmPwd) {
@@ -527,7 +471,7 @@ function showSettingsMsg(id, msg, type) {
 
 function esc(str) {
   if (!str) return '';
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 
@@ -552,7 +496,7 @@ function showAdminToast(msg) {
   setTimeout(() => t.remove(), 2500);
 }
 
-['editSongModal', 'userDetailModal', 'adminConfirmModal'].forEach(id => {
+['editSongModal','userDetailModal','adminConfirmModal'].forEach(id => {
   const el = document.getElementById(id);
-  if (el) el.addEventListener('click', function (e) { if (e.target === this) this.classList.add('hidden'); });
+  if (el) el.addEventListener('click', function(e) { if (e.target === this) this.classList.add('hidden'); });
 });
