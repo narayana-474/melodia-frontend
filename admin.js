@@ -7,7 +7,7 @@
 //   👇 Replace this with your actual deployed backend URL
 const DEPLOYED_BACKEND_URL = 'https://melodia-backend-5f8g.onrender.com/api';
 
-const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.0')
+const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? 'http://localhost:5000/api'
   : DEPLOYED_BACKEND_URL;
 // ===================================================================
@@ -23,30 +23,70 @@ function togglePwd(inputId, checkbox) {
   if (input) input.type = checkbox.checked ? 'text' : 'password';
 }
 
+// ===== SERVER WAKE-UP (Render free tier sleeps after 15 min) =====
+async function wakeUpServer(maxWaitMs = 35000) {
+  const ping = async () => {
+    try {
+      const r = await fetch(`${API_BASE_URL}/songs`, { cache: 'no-store' });
+      return r.ok;
+    } catch { return false; }
+  };
+  if (await ping()) return true;
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    await new Promise(r => setTimeout(r, 3000));
+    if (await ping()) return true;
+    const s = Math.round((Date.now() - start) / 1000);
+    adminErr(`⏳ Server is waking up… (${s}s) — please wait`);
+  }
+  return false;
+}
+
 // ===== ADMIN LOGIN =====
 async function adminLogin() {
   const email = document.getElementById('adminEmail').value.trim();
   const password = document.getElementById('adminPassword').value;
   if (!email || !password) return adminErr('Please enter credentials.');
+
+  const loginBtn = document.querySelector('button[onclick="adminLogin()"]');
+  if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'Connecting…'; }
+
   try {
+    adminErr('⏳ Connecting to server…');
+    const alive = await wakeUpServer(35000);
+    if (!alive) {
+      if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Login as Admin'; }
+      return adminErr('❌ Server unreachable. Check your backend URL or Render dashboard.');
+    }
+
     const res = await fetch(`${API_BASE_URL}/auth/admin-login`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
     const data = await res.json();
-    if (!res.ok) return adminErr(data.message || 'Invalid admin credentials.');
+    if (!res.ok) {
+      if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Login as Admin'; }
+      return adminErr(data.message || 'Invalid admin credentials.');
+    }
     adminToken = data.token;
     localStorage.setItem('rhythmAdminToken', adminToken);
     startAdminApp();
-  } catch {
-    adminErr('Cannot connect to server. Make sure node server.js is running.');
+  } catch (e) {
+    if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Login as Admin'; }
+    adminErr('❌ Cannot connect to server. Check your internet connection.');
   }
 }
 
 function adminErr(msg) {
   const el = document.getElementById('adminLoginError');
+  if (!el) return;
   el.textContent = msg;
-  setTimeout(() => el.textContent = '', 5000);
+  // Clear auto-dismiss timer if set — wake-up messages stay until replaced
+  if (el._clearTimer) clearTimeout(el._clearTimer);
+  // Only auto-clear short/final messages, not ongoing status messages
+  if (!msg.startsWith('⏳')) {
+    el._clearTimer = setTimeout(() => { el.textContent = ''; }, 6000);
+  }
 }
 
 // Auto-logout when token has expired
@@ -93,7 +133,7 @@ function adminSection(name) {
   document.getElementById(map[name])?.classList.remove('hidden');
   event?.target?.closest('.nav-link')?.classList.add('active');
   if (name === 'manage') renderAdminSongsTable(allAdminSongs);
-  if (name === 'users')  loadAdminUsers();
+  if (name === 'users') loadAdminUsers();
 }
 
 // ===== UPLOAD SONG =====
@@ -192,7 +232,7 @@ function showUploadStatus(type, msg) {
 }
 
 function clearUploadForm() {
-  ['uSongName','uMovieName','uCast','uSinger','uMusicDirector','uMovieDirector','uLabel','uLyrics','uYear','uGenre'].forEach(id => {
+  ['uSongName', 'uMovieName', 'uCast', 'uSinger', 'uMusicDirector', 'uMovieDirector', 'uLabel', 'uLyrics', 'uYear', 'uGenre'].forEach(id => {
     document.getElementById(id).value = '';
   });
   document.getElementById('uCategory').value = '';
@@ -209,7 +249,7 @@ function clearUploadForm() {
 function normalizeSong(s) {
   return {
     ...s,
-    cast_members:  s.cast_members  || s.cast || '',
+    cast_members: s.cast_members || s.cast || '',
     song_category: s.song_category || '',
     song_language: s.song_language || '',
   };
@@ -279,18 +319,18 @@ async function saveEditSong() {
   const id = document.getElementById('editSongId').value;
   const castValue = document.getElementById('editCast').value.trim();
   const updated = {
-    songName:      document.getElementById('editSongName').value.trim(),
-    movieName:     document.getElementById('editMovieName').value.trim(),
-    cast_members:  castValue, cast: castValue,
-    singer:        document.getElementById('editSinger').value.trim(),
+    songName: document.getElementById('editSongName').value.trim(),
+    movieName: document.getElementById('editMovieName').value.trim(),
+    cast_members: castValue, cast: castValue,
+    singer: document.getElementById('editSinger').value.trim(),
     musicDirector: document.getElementById('editMusicDirector').value.trim(),
     movieDirector: document.getElementById('editMovieDirector').value.trim(),
-    label:         document.getElementById('editLabel').value.trim(),
-    genre:         document.getElementById('editGenre').value.trim(),
-    year:          document.getElementById('editYear').value,
+    label: document.getElementById('editLabel').value.trim(),
+    genre: document.getElementById('editGenre').value.trim(),
+    year: document.getElementById('editYear').value,
     song_category: document.getElementById('editCategory').value.trim(),
     song_language: document.getElementById('editLanguage').value.trim(),
-    lyrics:        document.getElementById('editLyrics').value.trim(),
+    lyrics: document.getElementById('editLyrics').value.trim(),
   };
   try {
     const res = await fetch(`${API_BASE_URL}/songs/${id}`, {
@@ -368,11 +408,11 @@ function renderUsersTable(users) {
   tbody.innerHTML = users.map(u => {
     const uid = u.id || u._id;
     const joinedDate = u.created_at || u.createdAt;
-    const dateStr = joinedDate ? new Date(joinedDate).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+    const dateStr = joinedDate ? new Date(joinedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
     const likedArr = Array.isArray(u.liked_songs) ? u.liked_songs : JSON.parse(localStorage.getItem(`liked_${uid}`) || '[]');
     const playlistArr = Array.isArray(u.playlists) ? u.playlists : JSON.parse(localStorage.getItem(`playlists_${uid}`) || '[]');
     return `<tr>
-      <td><div style="display:flex;align-items:center;gap:10px;"><span class="user-avatar">${(u.name||'?')[0].toUpperCase()}</span><span style="font-weight:600;color:#f0f0f5;">${esc(u.name)}</span></div></td>
+      <td><div style="display:flex;align-items:center;gap:10px;"><span class="user-avatar">${(u.name || '?')[0].toUpperCase()}</span><span style="font-weight:600;color:#f0f0f5;">${esc(u.name)}</span></div></td>
       <td style="color:#888899;">${esc(u.email)}</td>
       <td style="color:#888899;font-size:13px;">${dateStr}</td>
       <td style="color:#ff8fa3;font-weight:600;">${likedArr.length}</td>
@@ -406,11 +446,11 @@ function updateAdminStats() {
 function viewUserDetail(uid) {
   const user = allAdminUsers.find(u => (u.id || u._id) === uid); if (!user) return;
   currentViewUserId = uid;
-  document.getElementById('udAvatar').textContent = (user.name||'?')[0].toUpperCase();
+  document.getElementById('udAvatar').textContent = (user.name || '?')[0].toUpperCase();
   document.getElementById('udName').textContent = user.name;
   document.getElementById('udEmail').textContent = user.email;
   const joinedDate = user.created_at || user.createdAt;
-  document.getElementById('udJoined').textContent = joinedDate ? `Joined: ${new Date(joinedDate).toLocaleDateString('en-IN', { day:'2-digit', month:'long', year:'numeric' })}` : '';
+  document.getElementById('udJoined').textContent = joinedDate ? `Joined: ${new Date(joinedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}` : '';
   const likedArr = Array.isArray(user.liked_songs) ? user.liked_songs : JSON.parse(localStorage.getItem(`liked_${uid}`) || '[]');
   const playlistArr = Array.isArray(user.playlists) ? user.playlists : JSON.parse(localStorage.getItem(`playlists_${uid}`) || '[]');
   document.getElementById('udLiked').textContent = likedArr.length;
@@ -422,7 +462,7 @@ function closeUserDetail() { document.getElementById('userDetailModal').classLis
 
 async function adminDeleteUser(uid) {
   closeUserDetail();
-  confirmAdminDelete('user', uid, allAdminUsers.find(u => (u.id||u._id) === uid)?.name || 'this user');
+  confirmAdminDelete('user', uid, allAdminUsers.find(u => (u.id || u._id) === uid)?.name || 'this user');
 }
 
 function confirmAdminDelete(type, id, name) {
@@ -447,7 +487,7 @@ async function deleteUserById(uid) {
     await fetch(`${API_BASE_URL}/users/${uid}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${adminToken}` } });
   } catch {
     const users = JSON.parse(localStorage.getItem('rhythmUsers') || '[]');
-    localStorage.setItem('rhythmUsers', JSON.stringify(users.filter(u => (u.id||u._id) !== uid)));
+    localStorage.setItem('rhythmUsers', JSON.stringify(users.filter(u => (u.id || u._id) !== uid)));
     localStorage.removeItem(`liked_${uid}`);
     localStorage.removeItem(`playlists_${uid}`);
   }
@@ -457,9 +497,9 @@ async function deleteUserById(uid) {
 // ===== SETTINGS — CHANGE ADMIN CREDENTIALS =====
 async function changeAdminEmail() {
   const currentEmail = document.getElementById('currentAdminEmail').value.trim();
-  const newEmail     = document.getElementById('newAdminEmail').value.trim();
-  const password     = document.getElementById('emailChangePassword').value;
-  const msgEl        = document.getElementById('emailChangeMsg');
+  const newEmail = document.getElementById('newAdminEmail').value.trim();
+  const password = document.getElementById('emailChangePassword').value;
+  const msgEl = document.getElementById('emailChangeMsg');
 
   if (!currentEmail || !newEmail || !password) {
     return showSettingsMsg('emailChangeMsg', '❌ Please fill all fields.', 'error');
@@ -487,7 +527,7 @@ async function changeAdminEmail() {
 
 async function changeAdminPassword() {
   const currentPwd = document.getElementById('currentAdminPassword').value;
-  const newPwd     = document.getElementById('newAdminPassword').value;
+  const newPwd = document.getElementById('newAdminPassword').value;
   const confirmPwd = document.getElementById('confirmAdminPassword').value;
 
   if (!currentPwd || !newPwd || !confirmPwd) {
@@ -527,7 +567,7 @@ function showSettingsMsg(id, msg, type) {
 
 function esc(str) {
   if (!str) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 
@@ -552,7 +592,7 @@ function showAdminToast(msg) {
   setTimeout(() => t.remove(), 2500);
 }
 
-['editSongModal','userDetailModal','adminConfirmModal'].forEach(id => {
+['editSongModal', 'userDetailModal', 'adminConfirmModal'].forEach(id => {
   const el = document.getElementById(id);
-  if (el) el.addEventListener('click', function(e) { if (e.target === this) this.classList.add('hidden'); });
+  if (el) el.addEventListener('click', function (e) { if (e.target === this) this.classList.add('hidden'); });
 });
