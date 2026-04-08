@@ -7,7 +7,7 @@
 //   👇 Replace this with your actual deployed backend URL
 const DEPLOYED_BACKEND_URL = 'https://melodia-backend-5f8g.onrender.com/api';
 
-const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.0')
+const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '')
   ? 'http://localhost:5000/api'
   : DEPLOYED_BACKEND_URL;
 
@@ -103,7 +103,7 @@ let currentDetailSongId = null;
 let addToPlaylistSongId = null;
 let currentOpenPlaylistId = null;
 let isShuffle = false;
-let loopMode = 'none';
+let loopMode = 'playlist';
 let originalQueue = [];
 let currentSection = 'home';
 
@@ -883,7 +883,7 @@ function updateNowPlayingUI(song) {
   // Recreate the element to bust animation cache for accurate measuring
   marqueeWrap.innerHTML = `<div class="npfs-marquee" id="npfsMarquee">${esc(marqueeText)}</div>`;
   marqueeEl = document.getElementById('npfsMarquee');
-  
+
   setTimeout(() => {
     const overflows = marqueeEl.scrollWidth > marqueeWrap.clientWidth + 2;
     if (overflows) {
@@ -963,7 +963,7 @@ function openNowPlayingScreen() {
     // Recreate element to force clear bounds cache
     marqueeWrap.innerHTML = `<div class="npfs-marquee" id="npfsMarquee">${esc(marqueeText)}</div>`;
     marqueeEl = document.getElementById('npfsMarquee');
-    
+
     requestAnimationFrame(() => {
       const overflows = marqueeEl.scrollWidth > marqueeWrap.clientWidth + 2;
       if (overflows) {
@@ -997,18 +997,7 @@ function updateFsPlayPauseIcon() {
   document.getElementById('desktopPlayIcon')?.classList.toggle('hidden', isPlaying);
   document.getElementById('desktopPauseIcon')?.classList.toggle('hidden', !isPlaying);
 
-  // Sync fullscreen shuffle/loop active states
-  const fsShuffleBtn = document.getElementById('npfsShuffleBtn');
-  if (fsShuffleBtn) fsShuffleBtn.classList.toggle('active', isShuffle);
-  const fsLoopBtn = document.getElementById('npfsLoopBtn');
-  const fsLoopBadge = document.getElementById('npfsLoopBadge');
-  if (fsLoopBtn) fsLoopBtn.classList.toggle('active', loopMode !== 'none');
-  if (fsLoopBadge) fsLoopBadge.classList.toggle('hidden', loopMode !== 'single');
-  // Desktop loop
-  const loopBtn = document.getElementById('loopBtn');
-  const loopBadge = document.getElementById('loopBadge');
-  if (loopBtn) loopBtn.classList.toggle('active', loopMode !== 'none');
-  if (loopBadge) loopBadge.classList.toggle('hidden', loopMode !== 'single');
+  updateLoopUI();
   // Desktop queue active
   const qDesktop = document.getElementById('queueDesktopBtn');
   if (qDesktop) {
@@ -1032,10 +1021,10 @@ function fmtTime(s) {
   return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 }
 
-// ===== SHUFFLE =====
-function toggleShuffle() {
-  isShuffle = !isShuffle;
-  document.getElementById('shuffleBtn').classList.toggle('active', isShuffle);
+// ===== SHUFFLE & LOOP =====
+function setShuffle(state) {
+  if (isShuffle === state) return;
+  isShuffle = state;
   if (isShuffle) {
     originalQueue = [...currentQueue];
     const current = currentQueue[currentSongIndex];
@@ -1050,23 +1039,35 @@ function toggleShuffle() {
       if (currentSongIndex === -1) currentSongIndex = 0;
     }
   }
-  renderQueue(); showToast(isShuffle ? '🔀 Shuffle On' : '🔀 Shuffle Off');
+  renderQueue();
 }
 
-// ===== LOOP =====
 function cycleLoop() {
-  if (loopMode === 'none') loopMode = 'playlist';
-  else if (loopMode === 'playlist') loopMode = 'single';
-  else loopMode = 'none';
+  if (loopMode === 'playlist') {
+    loopMode = 'single';
+    setShuffle(false);
+  } else if (loopMode === 'single') {
+    loopMode = 'shuffle';
+    setShuffle(true);
+  } else {
+    loopMode = 'playlist';
+    setShuffle(false);
+  }
   updateLoopUI();
-  const msgs = { none: '🔁 Loop Off', playlist: '🔁 Playlist Loop On', single: '🔂 Single Loop On' };
+  const msgs = { playlist: '🔁 Playlist Loop On', single: '🔂 Single Loop On', shuffle: '🔀 Shuffle On' };
   showToast(msgs[loopMode]);
 }
+
 function updateLoopUI() {
-  const btn = document.getElementById('loopBtn');
-  const badge = document.getElementById('loopBadge');
-  btn.classList.toggle('active', loopMode !== 'none');
-  if (badge) badge.classList.toggle('hidden', loopMode !== 'single');
+  document.querySelectorAll('.loop-icon-repeat').forEach(el => el.classList.toggle('hidden', loopMode !== 'playlist'));
+  document.querySelectorAll('.loop-icon-repeat1').forEach(el => el.classList.toggle('hidden', loopMode !== 'single'));
+  document.querySelectorAll('.loop-icon-shuffle').forEach(el => el.classList.toggle('hidden', loopMode !== 'shuffle'));
+
+  const loopBtn = document.getElementById('loopBtn');
+  const fsLoopBtn = document.getElementById('npfsLoopBtn');
+  if (loopBtn) loopBtn.classList.add('active');
+  if (fsLoopBtn) fsLoopBtn.classList.add('active');
+
   audio.loop = loopMode === 'single';
 }
 
