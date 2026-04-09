@@ -1718,12 +1718,14 @@ body {
   background: #3a3a4a;
   border-radius: 2px;
   cursor: pointer;
-  overflow: hidden;
+  position: relative;
   transition: height 0.15s;
+  /* removed overflow:hidden so thumb knob is visible */
 }
 
-.progress-bar:hover {
-  height: 6px;
+.progress-bar:hover,
+.progress-bar.seeking {
+  height: 4px;
 }
 
 .progress-fill {
@@ -1731,11 +1733,10 @@ body {
   background: var(--text);
   border-radius: 2px;
   transition: width 0.2s linear;
+  pointer-events: none;
 }
 
-.progress-bar:hover .progress-fill {
-  background: var(--accent);
-}
+
 
 .np-right {
   display: flex;
@@ -2859,6 +2860,12 @@ textarea,
   cursor: pointer;
   position: relative;
   margin-bottom: 10px;
+  transition: height 0.15s;
+}
+
+.npfs-progress-bar:hover,
+.npfs-progress-bar.seeking {
+  height: 4px;
 }
 
 .npfs-progress-fill {
@@ -2866,7 +2873,10 @@ textarea,
   background: var(--text);
   border-radius: 2px;
   pointer-events: none;
+  transition: width 0.1s linear;
 }
+
+
 
 .npfs-times {
   display: flex;

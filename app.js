@@ -118,6 +118,7 @@ window.onload = async () => {
   const saved = localStorage.getItem('rhythmUser');
   if (saved) { currentUser = JSON.parse(saved); startApp(); }
   setupFullscreenSeek();
+  setupMiniSeek();
 };
 
 function setupFullscreenSeek() {
@@ -810,8 +811,64 @@ function nextSong() {
     loadAndPlay();
   }
 }
-function seekSong(e) { if (!audio.duration) return; audio.currentTime = (e.offsetX / e.currentTarget.offsetWidth) * audio.duration; }
+// ── Unified seek helpers ──────────────────────────────────────────────
+let _miniSeeking = false;
+let _miniSeekerId = null;
 
+function _seekBarAt(bar, clientX) {
+  const rect = bar.getBoundingClientRect();
+  const x = Math.min(Math.max(0, clientX - rect.left), rect.width);
+  if (audio.duration) audio.currentTime = (x / rect.width) * audio.duration;
+  _updateAllProgress();
+}
+
+function _updateAllProgress() {
+  if (!audio.duration) return;
+  const pct = (audio.currentTime / audio.duration * 100) + '%';
+  const fill = document.getElementById('progressFill');
+  if (fill) fill.style.width = pct;
+  updateFsProgress();
+}
+
+// Mini player bar — pointer drag seek
+function setupMiniSeek() {
+  const bar = document.getElementById('miniProgressBar');
+  if (!bar) return;
+
+  bar.addEventListener('pointerdown', (e) => {
+    if (!audio.duration) return;
+    e.preventDefault();
+    _miniSeeking = true;
+    _miniSeekerId = e.pointerId;
+    bar.setPointerCapture && bar.setPointerCapture(e.pointerId);
+    bar.classList.add('seeking');
+    _seekBarAt(bar, e.clientX);
+  });
+
+  bar.addEventListener('pointermove', (e) => {
+    if (!_miniSeeking || e.pointerId !== _miniSeekerId) return;
+    _seekBarAt(bar, e.clientX);
+  });
+
+  const _endMini = (e) => {
+    if (!_miniSeeking || e.pointerId !== _miniSeekerId) return;
+    _miniSeeking = false;
+    _miniSeekerId = null;
+    bar.classList.remove('seeking');
+    bar.releasePointerCapture && bar.releasePointerCapture(e.pointerId);
+  };
+  bar.addEventListener('pointerup', _endMini);
+  bar.addEventListener('pointercancel', _endMini);
+  bar.addEventListener('lostpointercapture', _endMini);
+}
+
+// Legacy click-only fallback (kept for any other callers)
+function seekSong(e) {
+  if (!audio.duration) return;
+  audio.currentTime = (e.offsetX / e.currentTarget.offsetWidth) * audio.duration;
+}
+
+// Fullscreen bar seek ─────────────────────────────────────────────────
 function startFsSeek(e) {
   if (!audio.duration) return;
   e.preventDefault();
@@ -819,6 +876,7 @@ function startFsSeek(e) {
   fsSeeking = true;
   fsSeekPointerId = e.pointerId;
   bar.setPointerCapture && bar.setPointerCapture(e.pointerId);
+  bar.classList.add('seeking');
   seekSongOnBar(bar, e.clientX);
 }
 
@@ -831,13 +889,14 @@ function endFsSeek(e) {
   if (!fsSeeking || e.pointerId !== fsSeekPointerId) return;
   fsSeeking = false;
   fsSeekPointerId = null;
+  e.currentTarget.classList.remove('seeking');
   e.currentTarget.releasePointerCapture && e.currentTarget.releasePointerCapture(e.pointerId);
 }
 
 function seekSongOnBar(bar, clientX) {
   const rect = bar.getBoundingClientRect();
   const x = Math.min(Math.max(0, clientX - rect.left), rect.width);
-  audio.currentTime = (x / rect.width) * audio.duration;
+  if (audio.duration) audio.currentTime = (x / rect.width) * audio.duration;
   updateFsProgress();
 }
 
@@ -845,7 +904,8 @@ function setVolume(v) { audio.volume = v; }
 
 audio.addEventListener('timeupdate', () => {
   if (!audio.duration) return;
-  document.getElementById('progressFill').style.width = (audio.currentTime / audio.duration * 100) + '%';
+  const pct = (audio.currentTime / audio.duration * 100) + '%';
+  document.getElementById('progressFill').style.width = pct;
   document.getElementById('currentTime').textContent = fmtTime(audio.currentTime);
   document.getElementById('totalTime').textContent = fmtTime(audio.duration);
   updateFsProgress();
@@ -1169,9 +1229,7 @@ function updateFsProgress() {
   if (!audio.duration) return;
   const pct = (audio.currentTime / audio.duration) * 100;
   const fill = document.getElementById('npfsProgressFill');
-  const thumb = document.getElementById('npfsProgressThumb');
   if (fill) fill.style.width = pct + '%';
-  if (thumb) thumb.style.left = pct + '%';
   document.getElementById('npfsCurrentTime').textContent = fmtTime(audio.currentTime);
   document.getElementById('npfsTotalTime').textContent = fmtTime(audio.duration);
 }
