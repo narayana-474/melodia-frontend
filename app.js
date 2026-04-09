@@ -118,9 +118,17 @@ window.onload = async () => {
   const saved = localStorage.getItem('rhythmUser');
   if (saved) { currentUser = JSON.parse(saved); startApp(); }
   setupFullscreenSeek();
-  setupMiniSeek();
 };
 
+function setupFullscreenSeek() {
+  const progressBar = document.getElementById('npfsProgressBar');
+  if (!progressBar) return;
+  progressBar.addEventListener('pointerdown', startFsSeek);
+  progressBar.addEventListener('pointermove', moveFsSeek);
+  progressBar.addEventListener('pointerup', endFsSeek);
+  progressBar.addEventListener('pointercancel', endFsSeek);
+  progressBar.addEventListener('lostpointercapture', endFsSeek);
+}
 
 // ===== PREVENT PULL-TO-REFRESH =====
 let _touchStartY = 0;
@@ -133,8 +141,6 @@ document.addEventListener('touchmove', (e) => {
   const queuePanel = document.getElementById('queuePanel');
   if (fullscreen && !fullscreen.classList.contains('hidden') && fullscreen.contains(e.target)) return;
   if (queuePanel && !queuePanel.classList.contains('hidden') && queuePanel.contains(e.target)) return;
-  // Allow touch moves on seek bars (they handle their own preventDefault)
-  if (e.target.closest('#miniProgressBar') || e.target.closest('#npfsProgressBar')) return;
   // Only block if pulling DOWN while at very top of page
   const dy = e.touches[0].clientY - _touchStartY;
   const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
@@ -804,94 +810,34 @@ function nextSong() {
     loadAndPlay();
   }
 }
-// ── Unified seek helpers ──────────────────────────────────────────────
+function seekSong(e) { if (!audio.duration) return; audio.currentTime = (e.offsetX / e.currentTarget.offsetWidth) * audio.duration; }
 
-function _applySeek(bar, clientX) {
+function startFsSeek(e) {
   if (!audio.duration) return;
+  e.preventDefault();
+  const bar = e.currentTarget;
+  fsSeeking = true;
+  fsSeekPointerId = e.pointerId;
+  bar.setPointerCapture && bar.setPointerCapture(e.pointerId);
+  seekSongOnBar(bar, e.clientX);
+}
+
+function moveFsSeek(e) {
+  if (!fsSeeking || e.pointerId !== fsSeekPointerId) return;
+  seekSongOnBar(e.currentTarget, e.clientX);
+}
+
+function endFsSeek(e) {
+  if (!fsSeeking || e.pointerId !== fsSeekPointerId) return;
+  fsSeeking = false;
+  fsSeekPointerId = null;
+  e.currentTarget.releasePointerCapture && e.currentTarget.releasePointerCapture(e.pointerId);
+}
+
+function seekSongOnBar(bar, clientX) {
   const rect = bar.getBoundingClientRect();
   const x = Math.min(Math.max(0, clientX - rect.left), rect.width);
   audio.currentTime = (x / rect.width) * audio.duration;
-}
-
-// Attach both touch (passive:false for preventDefault) and mouse events to a bar
-function _attachSeekListeners(bar, onSeekUpdate) {
-  let _active = false;
-
-  // ── Touch events (most reliable on mobile) ──────────────────────────
-  bar.addEventListener('touchstart', (e) => {
-    if (!audio.duration) return;
-    e.preventDefault(); // blocks scroll & pull-to-refresh during seek
-    e.stopPropagation();
-    _active = true;
-    _applySeek(bar, e.touches[0].clientX);
-    onSeekUpdate && onSeekUpdate();
-  }, { passive: false });
-
-  bar.addEventListener('touchmove', (e) => {
-    if (!_active) return;
-    e.preventDefault();
-    e.stopPropagation();
-    _applySeek(bar, e.touches[0].clientX);
-    onSeekUpdate && onSeekUpdate();
-  }, { passive: false });
-
-  bar.addEventListener('touchend', (e) => {
-    if (!_active) return;
-    e.preventDefault();
-    _active = false;
-    onSeekUpdate && onSeekUpdate();
-  }, { passive: false });
-
-  bar.addEventListener('touchcancel', () => { _active = false; }, { passive: true });
-
-  // ── Mouse events (desktop) ───────────────────────────────────────────
-  bar.addEventListener('mousedown', (e) => {
-    if (!audio.duration) return;
-    e.preventDefault();
-    _active = true;
-    _applySeek(bar, e.clientX);
-    onSeekUpdate && onSeekUpdate();
-
-    const onMove = (ev) => { if (_active) { _applySeek(bar, ev.clientX); onSeekUpdate && onSeekUpdate(); } };
-    const onUp = () => { _active = false; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  });
-}
-
-// Mini player bar seek
-function setupMiniSeek() {
-  const bar = document.getElementById('miniProgressBar');
-  if (!bar) return;
-  _attachSeekListeners(bar, () => {
-    if (!audio.duration) return;
-    const pct = (audio.currentTime / audio.duration * 100) + '%';
-    const fill = document.getElementById('progressFill');
-    if (fill) fill.style.width = pct;
-    document.getElementById('currentTime').textContent = fmtTime(audio.currentTime);
-  });
-}
-
-// Legacy click-only fallback (kept for any other callers)
-function seekSong(e) {
-  if (!audio.duration) return;
-  audio.currentTime = (e.offsetX / e.currentTarget.offsetWidth) * audio.duration;
-}
-
-// Fullscreen bar seek ─────────────────────────────────────────────────
-function setupFullscreenSeek() {
-  const bar = document.getElementById('npfsProgressBar');
-  if (!bar) return;
-  _attachSeekListeners(bar, () => updateFsProgress());
-}
-
-// Keep these stubs so nothing else breaks
-function startFsSeek() {}
-function moveFsSeek() {}
-function endFsSeek() {}
-
-function seekSongOnBar(bar, clientX) {
-  _applySeek(bar, clientX);
   updateFsProgress();
 }
 
@@ -899,8 +845,7 @@ function setVolume(v) { audio.volume = v; }
 
 audio.addEventListener('timeupdate', () => {
   if (!audio.duration) return;
-  const pct = (audio.currentTime / audio.duration * 100) + '%';
-  document.getElementById('progressFill').style.width = pct;
+  document.getElementById('progressFill').style.width = (audio.currentTime / audio.duration * 100) + '%';
   document.getElementById('currentTime').textContent = fmtTime(audio.currentTime);
   document.getElementById('totalTime').textContent = fmtTime(audio.duration);
   updateFsProgress();
@@ -1224,7 +1169,9 @@ function updateFsProgress() {
   if (!audio.duration) return;
   const pct = (audio.currentTime / audio.duration) * 100;
   const fill = document.getElementById('npfsProgressFill');
+  const thumb = document.getElementById('npfsProgressThumb');
   if (fill) fill.style.width = pct + '%';
+  if (thumb) thumb.style.left = pct + '%';
   document.getElementById('npfsCurrentTime').textContent = fmtTime(audio.currentTime);
   document.getElementById('npfsTotalTime').textContent = fmtTime(audio.duration);
 }
@@ -1438,7 +1385,13 @@ function removeFromQueue(idx) {
   renderQueue();
 }
 
-function jumpToQueue(idx) { currentSongIndex = idx; loadAndPlay(); renderQueue(); }
+function jumpToQueue(idx) {
+  currentSongIndex = idx;
+  loadAndPlay();
+  renderQueue();
+  const panel = document.getElementById('queuePanel');
+  if (panel && !panel.classList.contains('hidden')) toggleQueue();
+}
 
 // ===== LIKED SONGS =====
 async function loadLikedSongs() {
@@ -2251,9 +2204,7 @@ document.addEventListener('keydown', function (e) {
 
 // ===== TOAST & MSG =====
 function showToast(msg) {
-  const existing = document.querySelector('.toast'); if (existing) existing.remove();
-  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
-  document.body.appendChild(t); setTimeout(() => t.remove(), 2500);
+  // Toast notifications removed - keep function no-op to avoid breaking callers.
 }
 function showMsg(id, msg) { const el = document.getElementById(id); if (el) el.textContent = msg; }
 
