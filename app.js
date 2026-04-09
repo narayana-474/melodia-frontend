@@ -107,6 +107,8 @@ let isShuffle = false;
 let loopMode = 'playlist';
 let originalQueue = [];
 let currentSection = 'home';
+let fsSeeking = false;
+let fsSeekPointerId = null;
 
 const audio = document.getElementById('audioPlayer');
 
@@ -115,7 +117,18 @@ window.onload = async () => {
   setGreeting();
   const saved = localStorage.getItem('rhythmUser');
   if (saved) { currentUser = JSON.parse(saved); startApp(); }
+  setupFullscreenSeek();
 };
+
+function setupFullscreenSeek() {
+  const progressBar = document.getElementById('npfsProgressBar');
+  if (!progressBar) return;
+  progressBar.addEventListener('pointerdown', startFsSeek);
+  progressBar.addEventListener('pointermove', moveFsSeek);
+  progressBar.addEventListener('pointerup', endFsSeek);
+  progressBar.addEventListener('pointercancel', endFsSeek);
+  progressBar.addEventListener('lostpointercapture', endFsSeek);
+}
 
 // ===== PREVENT PULL-TO-REFRESH =====
 let _touchStartY = 0;
@@ -798,6 +811,36 @@ function nextSong() {
   }
 }
 function seekSong(e) { if (!audio.duration) return; audio.currentTime = (e.offsetX / e.currentTarget.offsetWidth) * audio.duration; }
+
+function startFsSeek(e) {
+  if (!audio.duration) return;
+  e.preventDefault();
+  const bar = e.currentTarget;
+  fsSeeking = true;
+  fsSeekPointerId = e.pointerId;
+  bar.setPointerCapture && bar.setPointerCapture(e.pointerId);
+  seekSongOnBar(bar, e.clientX);
+}
+
+function moveFsSeek(e) {
+  if (!fsSeeking || e.pointerId !== fsSeekPointerId) return;
+  seekSongOnBar(e.currentTarget, e.clientX);
+}
+
+function endFsSeek(e) {
+  if (!fsSeeking || e.pointerId !== fsSeekPointerId) return;
+  fsSeeking = false;
+  fsSeekPointerId = null;
+  e.currentTarget.releasePointerCapture && e.currentTarget.releasePointerCapture(e.pointerId);
+}
+
+function seekSongOnBar(bar, clientX) {
+  const rect = bar.getBoundingClientRect();
+  const x = Math.min(Math.max(0, clientX - rect.left), rect.width);
+  audio.currentTime = (x / rect.width) * audio.duration;
+  updateFsProgress();
+}
+
 function setVolume(v) { audio.volume = v; }
 
 audio.addEventListener('timeupdate', () => {

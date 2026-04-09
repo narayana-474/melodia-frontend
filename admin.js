@@ -69,11 +69,11 @@ function adminLogout() {
   location.reload();
 }
 
-function startAdminApp() {
+async function startAdminApp() {
   document.getElementById('adminLoginOverlay').classList.add('hidden');
   document.getElementById('adminApp').classList.remove('hidden');
-  loadAdminSongs();
-  loadAdminUsers();
+  await loadAdminSongs();
+  await loadAdminUsers();
 }
 
 window.onload = () => {
@@ -361,6 +361,13 @@ async function loadAdminUsers() {
   updateAdminStats();
 }
 
+function getValidAdminLikedSongs(user) {
+  const uid = user.id || user._id;
+  const likedArr = Array.isArray(user.liked_songs) ? user.liked_songs : JSON.parse(localStorage.getItem(`liked_${uid}`) || '[]');
+  const validSongIds = new Set(allAdminSongs.map(song => song._id || song.id));
+  return likedArr.filter(id => validSongIds.has(id));
+}
+
 function renderUsersTable(users) {
   const tbody = document.getElementById('adminUsersTableBody');
   if (!tbody) return;
@@ -369,7 +376,7 @@ function renderUsersTable(users) {
     const uid = u.id || u._id;
     const joinedDate = u.created_at || u.createdAt;
     const dateStr = joinedDate ? new Date(joinedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
-    const likedArr = Array.isArray(u.liked_songs) ? u.liked_songs : JSON.parse(localStorage.getItem(`liked_${uid}`) || '[]');
+    const likedArr = getValidAdminLikedSongs(u);
     const playlistArr = Array.isArray(u.playlists) ? u.playlists : JSON.parse(localStorage.getItem(`playlists_${uid}`) || '[]');
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:10px;"><span class="user-avatar">${(u.name || '?')[0].toUpperCase()}</span><span style="font-weight:600;color:#f0f0f5;">${esc(u.name)}</span></div></td>
@@ -395,9 +402,8 @@ function updateAdminStats() {
   document.getElementById('statTotalSongs').textContent = allAdminSongs.length || JSON.parse(localStorage.getItem('rhythmSongs') || '[]').length;
   let totalLikes = 0, totalPlaylists = 0;
   allAdminUsers.forEach(u => {
-    const uid = u.id || u._id;
-    totalLikes += (Array.isArray(u.liked_songs) ? u.liked_songs : JSON.parse(localStorage.getItem(`liked_${uid}`) || '[]')).length;
-    totalPlaylists += (Array.isArray(u.playlists) ? u.playlists : JSON.parse(localStorage.getItem(`playlists_${uid}`) || '[]')).length;
+    totalLikes += getValidAdminLikedSongs(u).length;
+    totalPlaylists += (Array.isArray(u.playlists) ? u.playlists : JSON.parse(localStorage.getItem(`playlists_${u.id || u._id}`) || '[]')).length;
   });
   document.getElementById('statTotalLikes').textContent = totalLikes;
   document.getElementById('statTotalPlaylists').textContent = totalPlaylists;
@@ -411,7 +417,7 @@ function viewUserDetail(uid) {
   document.getElementById('udEmail').textContent = user.email;
   const joinedDate = user.created_at || user.createdAt;
   document.getElementById('udJoined').textContent = joinedDate ? `Joined: ${new Date(joinedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}` : '';
-  const likedArr = Array.isArray(user.liked_songs) ? user.liked_songs : JSON.parse(localStorage.getItem(`liked_${uid}`) || '[]');
+  const likedArr = getValidAdminLikedSongs(user);
   const playlistArr = Array.isArray(user.playlists) ? user.playlists : JSON.parse(localStorage.getItem(`playlists_${uid}`) || '[]');
   document.getElementById('udLiked').textContent = likedArr.length;
   document.getElementById('udPlaylists').textContent = playlistArr.length;
