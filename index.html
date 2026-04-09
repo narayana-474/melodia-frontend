@@ -588,16 +588,17 @@
   <!-- QUEUE PANEL -->
   <div id="queuePanel" class="queue-panel hidden">
     <div class="queue-header">
-      <h3>Queue</h3>
+      <div>
+        <h3>Now Playing</h3>
+      </div>
       <button class="queue-close-btn" onclick="toggleQueue()">✕</button>
     </div>
-    <div class="queue-now">
-      <div class="queue-section-label">NOW PLAYING</div>
-      <div id="queueNowPlaying" class="queue-item active"></div>
-    </div>
-    <div class="queue-next">
-      <div class="queue-section-label">NEXT UP</div>
-      <div id="queueList"></div>
+    <div class="queue-body">
+      <div id="queueNowPlaying"></div>
+      <div class="queue-upcoming">
+        <div class="queue-section-label">Up Next</div>
+        <div id="queueList" class="queue-list"></div>
+      </div>
     </div>
   </div>
 

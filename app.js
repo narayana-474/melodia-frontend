@@ -1385,7 +1385,13 @@ function removeFromQueue(idx) {
   renderQueue();
 }
 
-function jumpToQueue(idx) { currentSongIndex = idx; loadAndPlay(); renderQueue(); }
+function jumpToQueue(idx) {
+  currentSongIndex = idx;
+  loadAndPlay();
+  renderQueue();
+  const panel = document.getElementById('queuePanel');
+  if (panel && !panel.classList.contains('hidden')) toggleQueue();
+}
 
 // ===== LIKED SONGS =====
 async function loadLikedSongs() {
@@ -2198,9 +2204,7 @@ document.addEventListener('keydown', function (e) {
 
 // ===== TOAST & MSG =====
 function showToast(msg) {
-  const existing = document.querySelector('.toast'); if (existing) existing.remove();
-  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
-  document.body.appendChild(t); setTimeout(() => t.remove(), 2500);
+  // Toast notifications removed - keep function no-op to avoid breaking callers.
 }
 function showMsg(id, msg) { const el = document.getElementById(id); if (el) el.textContent = msg; }
 
