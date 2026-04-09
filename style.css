@@ -1870,30 +1870,40 @@ body {
 /* QUEUE PANEL */
 .queue-panel {
   position: fixed;
-  top: var(--topnav-h);
   left: 0;
   bottom: var(--bar-h);
+  top: var(--topnav-h);
   width: 320px;
   z-index: 350;
-  background: linear-gradient(180deg, #111118, #0e0e16);
-  border-top-right-radius: 24px;
-  border-bottom-right-radius: 24px;
+  background: #111118;
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   animation: slideInLeft 0.25s ease;
   overflow: hidden;
-  box-shadow: 10px 0 40px rgba(0, 0, 0, 0.35);
 }
 
-@keyframes slideUp {
+@keyframes slideInLeft {
   from {
     opacity: 0;
-    transform: translate(-50%, 20px);
+    transform: translateX(-20px);
   }
 
   to {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
@@ -1901,34 +1911,26 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 20px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 20px 20px 14px;
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
-}
-
-.queue-label {
-  font-size: 11px;
-  letter-spacing: 2px;
-  font-weight: 800;
-  color: var(--accent);
-  margin-bottom: 4px;
 }
 
 .queue-header h3 {
   font-family: var(--font-head);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
 }
 
 .queue-close-btn {
   background: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--text-muted);
+  border: none;
+  color: var(--text-dim);
   font-size: 16px;
   cursor: pointer;
-  transition: all var(--transition);
-  width: 34px;
-  height: 34px;
+  transition: color var(--transition);
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1937,88 +1939,73 @@ body {
 
 .queue-close-btn:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.14);
+  background: var(--surface2);
 }
 
-.queue-body {
-  padding: 18px 18px 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+.queue-now {
+  padding: 12px 16px 0;
+  flex-shrink: 0;
+}
+
+.queue-next {
+  padding: 8px 16px 24px;
   flex: 1;
   overflow-y: auto;
+  scrollbar-width: none;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
 }
 
-.queue-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 22px;
-  padding: 16px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-height: 96px;
-}
-
-.queue-upcoming {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.queue-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.queue-next::-webkit-scrollbar {
+  display: none;
 }
 
 .queue-section-label {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 1.5px;
   color: var(--text-muted);
+  margin-bottom: 6px;
 }
 
 .queue-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 12px 12px 14px;
-  border-radius: 18px;
+  padding: 8px 10px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: background var(--transition), transform var(--transition);
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background var(--transition);
 }
 
 .queue-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-  transform: translateX(1px);
+  background: var(--surface2);
 }
 
 .queue-item.playing-now {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 63, 108, 0.1);
   cursor: default;
 }
 
-.queue-cover,
-.queue-cover-ph {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-}
-
 .queue-cover {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
   object-fit: cover;
+  background: var(--surface2);
+  flex-shrink: 0;
 }
 
 .queue-cover-ph {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  background: var(--surface2);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 16px;
+  flex-shrink: 0;
 }
 
 .queue-meta {
@@ -2028,21 +2015,21 @@ body {
 }
 
 .queue-title {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .queue-artist {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-dim);
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .queue-idx {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
   flex-shrink: 0;
 }
@@ -2073,7 +2060,6 @@ body {
   position: fixed;
   bottom: 96px;
   left: 50%;
-  right: auto;
   transform: translateX(-50%);
   background: #2a2a3a;
   border: 1px solid var(--border);
@@ -2084,12 +2070,7 @@ body {
   font-weight: 500;
   z-index: 9999;
   animation: slideUp 0.3s ease;
-  white-space: normal;
-  text-align: center;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  max-width: min(92vw, 420px);
+  white-space: nowrap;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
@@ -2215,14 +2196,14 @@ body {
     width: 100%;
     left: 0;
     right: 0;
-    top: 0;
-    bottom: 0;
-    height: 100vh;
+    top: auto;
+    bottom: calc(var(--bar-h) + var(--mob-nav-h));
+    height: 72vh;
     border-right: none;
     border-top: none;
-    border-radius: 0;
+    border-radius: 20px 20px 20px 20px;
     animation: queueSlideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: none;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.6);
     background: #161620;
   }
 
@@ -2238,9 +2219,16 @@ body {
     }
   }
 
-  /* Hide drag handle on mobile */
+  /* Drag handle */
   .queue-panel::before {
-    display: none;
+    content: '';
+    display: block;
+    width: 36px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    margin: 12px auto 0;
+    flex-shrink: 0;
   }
 
   .queue-header {
