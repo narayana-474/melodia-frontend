@@ -102,6 +102,7 @@ let playlists = [];
 let currentDetailSongId = null;
 let addToPlaylistSongId = null;
 let currentOpenPlaylistId = null;
+let sleepTimerId = null;
 let isShuffle = false;
 let loopMode = 'playlist';
 let originalQueue = [];
@@ -562,6 +563,127 @@ function ctxToggleLike() {
 }
 function ctxViewCredits() { if (ctxSongId) { openSongDetail(ctxSongId); closeContextMenu(); } }
 function ctxDownload() { if (ctxSongId) { downloadSong(ctxSongId); closeContextMenu(); } }
+
+function toggleFsMenu(event) {
+  event.stopPropagation();
+  const menu = document.getElementById('npfsMenu');
+  if (!menu) return;
+  const isOpen = !menu.classList.contains('hidden');
+  closeFsMenu();
+  if (!isOpen) {
+    updateFsMenuLikeText();
+    menu.classList.remove('hidden');
+    setTimeout(() => document.addEventListener('click', closeFsMenu), 0);
+  }
+}
+
+function closeFsMenu() {
+  const menu = document.getElementById('npfsMenu');
+  if (menu) menu.classList.add('hidden');
+  document.removeEventListener('click', closeFsMenu);
+}
+
+function updateFsMenuLikeText() {
+  const song = currentQueue[currentSongIndex];
+  const likeBtn = document.getElementById('npfsMenuLikeBtn');
+  if (!likeBtn || !song) return;
+  likeBtn.textContent = isLiked(song._id) ? 'Remove from liked songs' : 'Add to liked songs';
+}
+
+function fsMenuAddToLiked() {
+  if (!currentQueue[currentSongIndex]) return;
+  toggleLikeCurrent();
+  closeFsMenu();
+}
+
+function fsMenuAddToPlaylist() {
+  if (!currentQueue[currentSongIndex]) return;
+  openAddToPlaylist(currentQueue[currentSongIndex]._id);
+  closeFsMenu();
+}
+
+function fsMenuGoToAlbum() {
+  const song = currentQueue[currentSongIndex];
+  if (!song || !song.movieName) { showToast('No album information available.'); closeFsMenu(); return; }
+  closeNowPlayingScreen();
+  setTimeout(() => {
+    openMovieAlbumForSong(song._id);
+  }, 320); // wait for close animation
+}
+
+function fsMenuViewCredits() {
+  if (!currentQueue[currentSongIndex]) return;
+  openSongDetail(currentQueue[currentSongIndex]._id);
+  closeFsMenu();
+}
+
+function fsMenuSleepTimer() {
+  closeFsMenu();
+  openSleepTimerModal();
+}
+
+function openSleepTimerModal() {
+  const modal = document.getElementById('sleepTimerModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  const status = document.getElementById('sleepTimerMessage');
+  if (sleepTimerId) {
+    status.textContent = 'Sleep timer is active. Choose a new duration or cancel below.';
+    document.getElementById('sleepTimerCancelBtn').classList.remove('hidden');
+  } else {
+    status.textContent = 'Set a timer to pause playback automatically.';
+    document.getElementById('sleepTimerCancelBtn').classList.add('hidden');
+  }
+}
+
+function closeSleepTimerModal() {
+  document.getElementById('sleepTimerModal')?.classList.add('hidden');
+}
+
+function setSleepTimer(minutes) {
+  if (!currentQueue[currentSongIndex]) return showToast('No song is currently playing.');
+  if (sleepTimerId) clearTimeout(sleepTimerId);
+
+  if (minutes === 'track') {
+    const remaining = audio.duration - audio.currentTime;
+    if (!remaining || !isFinite(remaining) || remaining <= 0) {
+      return showToast('Unable to set end-of-track timer right now.');
+    }
+    sleepTimerId = setTimeout(() => {
+      audio.pause();
+      isPlaying = false;
+      updateFsPlayPauseIcon();
+      sleepTimerId = null;
+      showToast('Playback paused at end of track.');
+    }, remaining * 1000);
+    const status = document.getElementById('sleepTimerMessage');
+    if (status) status.textContent = 'Sleep timer set for end of current track.';
+    document.getElementById('sleepTimerCancelBtn')?.classList.remove('hidden');
+    showToast('Sleep timer set for end of track.');
+    return;
+  }
+
+  sleepTimerId = setTimeout(() => {
+    audio.pause();
+    isPlaying = false;
+    updateFsPlayPauseIcon();
+    sleepTimerId = null;
+    showToast('Sleep timer ended. Playback paused.');
+  }, minutes * 60 * 1000);
+  const status = document.getElementById('sleepTimerMessage');
+  if (status) status.textContent = `Sleep timer set for ${minutes} minute${minutes !== 1 ? 's' : ''}.`;
+  document.getElementById('sleepTimerCancelBtn')?.classList.remove('hidden');
+  showToast(`Sleep timer set for ${minutes} minutes.`);
+}
+
+function cancelSleepTimer() {
+  if (!sleepTimerId) { showToast('No active sleep timer to cancel.'); return; }
+  clearTimeout(sleepTimerId);
+  sleepTimerId = null;
+  document.getElementById('sleepTimerMessage').textContent = 'Sleep timer cancelled.';
+  document.getElementById('sleepTimerCancelBtn')?.classList.add('hidden');
+  showToast('Sleep timer cancelled.');
+}
 
 // Play Next — insert right after current song
 function playNext(id) {
@@ -1256,10 +1378,14 @@ async function toggleLike(id) {
   renderLikedSection();
 }
 function toggleLikeCurrent() { const s = currentQueue[currentSongIndex]; if (s) toggleLike(s._id); }
+function getCurrentLikedSongs() {
+  return allSongs.filter(s => likedSongs.includes(s._id));
+}
 function renderLikedSection() {
-  const songs = allSongs.filter(s => likedSongs.includes(s._id));
+  const songs = getCurrentLikedSongs();
   document.getElementById('likedCount').textContent = `${songs.length} song${songs.length !== 1 ? 's' : ''}`;
   renderSongsList(songs, 'likedSongsList');
+  renderAccountSection();
 }
 function confirmClearLiked() {
   if (currentUser?.isGuest) return showToast('Please login first!');
@@ -1941,11 +2067,12 @@ function renderAccountSection() {
     const el = document.getElementById('logoutUserName'); if (el) el.textContent = 'Guest';
     return;
   }
+  const likedCount = getCurrentLikedSongs().length;
   document.getElementById('accountName').textContent = currentUser.name;
   document.getElementById('accountEmail').textContent = currentUser.email;
   document.getElementById('accountAvatar').textContent = currentUser.name[0].toUpperCase();
   document.getElementById('accountStats').innerHTML = `
-    <span class="account-stat"><strong>${likedSongs.length}</strong> Liked Songs</span>
+    <span class="account-stat"><strong>${likedCount}</strong> Liked Songs</span>
     <span class="account-stat" style="margin-left:20px;"><strong>${playlists.length}</strong> Playlists</span>`;
   document.getElementById('newDisplayName').value = currentUser.name;
   const el = document.getElementById('logoutUserName');

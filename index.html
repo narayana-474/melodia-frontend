@@ -467,7 +467,22 @@
       <div class="npfs-header-info">
         <span class="npfs-from">NOW PLAYING</span>
       </div>
-      <div style="width:40px;"></div>
+      <div class="npfs-menu-wrap">
+        <button class="npfs-menu-btn" onclick="toggleFsMenu(event)" aria-label="More options">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="2" />
+            <circle cx="12" cy="12" r="2" />
+            <circle cx="12" cy="19" r="2" />
+          </svg>
+        </button>
+        <div class="npfs-menu hidden" id="npfsMenu">
+          <button class="npfs-menu-item" id="npfsMenuLikeBtn" onclick="fsMenuAddToLiked()">Add to liked songs</button>
+          <button class="npfs-menu-item" onclick="fsMenuAddToPlaylist()">Add to playlist</button>
+          <button class="npfs-menu-item" onclick="fsMenuGoToAlbum()">Go to album</button>
+          <button class="npfs-menu-item" onclick="fsMenuViewCredits()">View song credits</button>
+          <button class="npfs-menu-item" onclick="fsMenuSleepTimer()">Sleep timer</button>
+        </div>
+      </div>
     </div>
 
     <!-- Cover Art -->
@@ -615,6 +630,26 @@
       <h3>Add to Playlist</h3>
       <div id="addToPlaylistList" class="playlist-picker" style="margin-top:16px;"></div>
       <button class="btn-ghost" style="margin-top:12px;" onclick="closeAddToPlaylist()">Cancel</button>
+    </div>
+  </div>
+
+  <div id="sleepTimerModal" class="modal-overlay hidden">
+    <div class="modal-box small">
+      <h3>Sleep Timer</h3>
+      <p id="sleepTimerMessage" style="margin-top:12px;color:var(--text-muted);font-size:14px;">Set a timer to pause playback automatically.</p>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px;">
+        <button class="btn-primary" onclick="setSleepTimer(5)">5 min</button>
+        <button class="btn-primary" onclick="setSleepTimer(10)">10 min</button>
+        <button class="btn-primary" onclick="setSleepTimer(15)">15 min</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;">
+        <button class="btn-primary" onclick="setSleepTimer(30)">30 min</button>
+        <button class="btn-primary" onclick="setSleepTimer('track')">End of track</button>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+        <button class="btn-ghost hidden" id="sleepTimerCancelBtn" onclick="cancelSleepTimer()">Cancel timer</button>
+      </div>
+      <button class="btn-ghost" style="margin-top:12px;" onclick="closeSleepTimerModal()">Close</button>
     </div>
   </div>
 
