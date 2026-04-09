@@ -1720,6 +1720,7 @@ body {
   cursor: pointer;
   position: relative;
   transition: height 0.15s;
+  touch-action: none;
   /* removed overflow:hidden so thumb knob is visible */
 }
 
@@ -2861,6 +2862,7 @@ textarea,
   position: relative;
   margin-bottom: 10px;
   transition: height 0.15s;
+  touch-action: none;
 }
 
 .npfs-progress-bar:hover,
