@@ -330,6 +330,12 @@ async function startApp() {
       history.pushState({ section: currentSection }, '', '');
       return;
     }
+    // Close queue panel if open
+    const queuePanel = document.getElementById('queuePanel');
+    if (queuePanel && !queuePanel.classList.contains('hidden') && !state.queueOpen) {
+      toggleQueue(true);
+      return;
+    }
     // Close album view if opened from home
     if (state.albumView) {
       document.getElementById('searchResultsSection').classList.add('hidden');
@@ -1342,7 +1348,7 @@ function updateLyricsPanel() {
 }
 
 // ===== QUEUE PANEL =====
-function toggleQueue() {
+function toggleQueue(fromPopstate = false) {
   const panel = document.getElementById('queuePanel');
   if (!panel) return;
   const isOpen = panel.classList.contains('hidden');
@@ -1366,6 +1372,9 @@ function toggleQueue() {
       backdrop.onclick = toggleQueue;
       document.body.appendChild(backdrop);
     }
+    if (!fromPopstate) {
+      history.pushState({ section: currentSection, queueOpen: true }, '', '');
+    }
     renderQueue();
   } else {
     panel.classList.add('closing');
@@ -1388,6 +1397,10 @@ function toggleQueue() {
     }, { once: true });
 
     panel._queueCloseTimer = window.setTimeout(hidePanel, 400);
+
+    if (!fromPopstate && window.history.state?.queueOpen) {
+      history.back();
+    }
   }
 
   // Sync active state on both possible queue buttons
