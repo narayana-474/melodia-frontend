@@ -1136,7 +1136,10 @@ function updateNowPlayingUI(song) {
 // ===== FULLSCREEN NOW PLAYING =====
 function openQueueFromFullscreen() {
   const panel = document.getElementById('queuePanel');
-  if (panel) panel.classList.add('fullscreen');
+  if (panel) {
+    panel.dataset.forceFullscreen = 'true';
+    panel.classList.add('fullscreen');
+  }
   closeNowPlayingScreen();
   setTimeout(() => { toggleQueue(); }, 320); // wait for close animation
 }
@@ -1349,23 +1352,19 @@ function toggleQueue() {
     panel._queueCloseTimer = null;
   }
 
+  const forceFullscreen = panel.dataset.forceFullscreen === 'true';
+
   if (isOpen) {
     panel.classList.remove('hidden', 'closing');
-    if (window.innerWidth <= 768) {
-      panel.classList.add('fullscreen');
-    } else {
-      panel.classList.remove('fullscreen');
-    }
+    panel.classList.add('fullscreen');
     document.body.style.overflow = 'hidden';
-    if (window.innerWidth <= 768) {
-      let backdrop = document.getElementById('queueBackdrop');
-      if (!backdrop) {
-        backdrop = document.createElement('div');
-        backdrop.id = 'queueBackdrop';
-        backdrop.style.cssText = 'position:fixed;inset:0;z-index:349;background:rgba(0,0,0,0.6);backdrop-filter:blur(2px);';
-        backdrop.onclick = toggleQueue;
-        document.body.appendChild(backdrop);
-      }
+    let backdrop = document.getElementById('queueBackdrop');
+    if (!backdrop) {
+      backdrop = document.createElement('div');
+      backdrop.id = 'queueBackdrop';
+      backdrop.style.cssText = 'position:fixed;inset:0;z-index:349;background:rgba(0,0,0,0.6);backdrop-filter:blur(2px);';
+      backdrop.onclick = toggleQueue;
+      document.body.appendChild(backdrop);
     }
     renderQueue();
   } else {
@@ -1379,6 +1378,7 @@ function toggleQueue() {
       closed = true;
       panel.classList.add('hidden');
       panel.classList.remove('closing', 'fullscreen');
+      panel.dataset.forceFullscreen = '';
       document.body.style.overflow = '';
       panel._queueCloseTimer = null;
     };
