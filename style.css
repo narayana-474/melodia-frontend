@@ -2239,16 +2239,7 @@ body {
   cursor: pointer;
   transition: background 0.18s, transform 0.18s;
   position: relative;
-  animation: qpItemIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
-  border: 1px solid transparent;
 }
-
-.qp-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.06);
-  transform: translateX(3px);
-}
-
 .qp-item:hover .qp-item-remove {
   opacity: 1;
 }
@@ -2547,7 +2538,8 @@ body {
     right: 0;
     top: auto;
     bottom: calc(var(--bar-h) + var(--mob-nav-h));
-    height: 75vh;
+    height: calc(100vh - var(--bar-h) - var(--mob-nav-h));
+    max-height: calc(100vh - var(--bar-h) - var(--mob-nav-h));
     border-right: none;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 0;
@@ -2597,7 +2589,7 @@ body {
   }
 
   .qp-list-wrap {
-    padding: 6px 10px 32px;
+    padding: 6px 10px calc(var(--mob-nav-h) + 32px);
   }
 
   /* ===== MOBILE BOTTOM NAV ===== */
