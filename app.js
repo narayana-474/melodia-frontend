@@ -118,17 +118,9 @@ window.onload = async () => {
   const saved = localStorage.getItem('rhythmUser');
   if (saved) { currentUser = JSON.parse(saved); startApp(); }
   setupFullscreenSeek();
+  setupMiniSeek();
 };
 
-function setupFullscreenSeek() {
-  const progressBar = document.getElementById('npfsProgressBar');
-  if (!progressBar) return;
-  progressBar.addEventListener('pointerdown', startFsSeek);
-  progressBar.addEventListener('pointermove', moveFsSeek);
-  progressBar.addEventListener('pointerup', endFsSeek);
-  progressBar.addEventListener('pointercancel', endFsSeek);
-  progressBar.addEventListener('lostpointercapture', endFsSeek);
-}
 
 // ===== PREVENT PULL-TO-REFRESH =====
 let _touchStartY = 0;
@@ -141,6 +133,8 @@ document.addEventListener('touchmove', (e) => {
   const queuePanel = document.getElementById('queuePanel');
   if (fullscreen && !fullscreen.classList.contains('hidden') && fullscreen.contains(e.target)) return;
   if (queuePanel && !queuePanel.classList.contains('hidden') && queuePanel.contains(e.target)) return;
+  // Allow touch moves on seek bars (they handle their own preventDefault)
+  if (e.target.closest('#miniProgressBar') || e.target.closest('#npfsProgressBar')) return;
   // Only block if pulling DOWN while at very top of page
   const dy = e.touches[0].clientY - _touchStartY;
   const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
@@ -810,34 +804,94 @@ function nextSong() {
     loadAndPlay();
   }
 }
-function seekSong(e) { if (!audio.duration) return; audio.currentTime = (e.offsetX / e.currentTarget.offsetWidth) * audio.duration; }
+// ── Unified seek helpers ──────────────────────────────────────────────
 
-function startFsSeek(e) {
+function _applySeek(bar, clientX) {
   if (!audio.duration) return;
-  e.preventDefault();
-  const bar = e.currentTarget;
-  fsSeeking = true;
-  fsSeekPointerId = e.pointerId;
-  bar.setPointerCapture && bar.setPointerCapture(e.pointerId);
-  seekSongOnBar(bar, e.clientX);
-}
-
-function moveFsSeek(e) {
-  if (!fsSeeking || e.pointerId !== fsSeekPointerId) return;
-  seekSongOnBar(e.currentTarget, e.clientX);
-}
-
-function endFsSeek(e) {
-  if (!fsSeeking || e.pointerId !== fsSeekPointerId) return;
-  fsSeeking = false;
-  fsSeekPointerId = null;
-  e.currentTarget.releasePointerCapture && e.currentTarget.releasePointerCapture(e.pointerId);
-}
-
-function seekSongOnBar(bar, clientX) {
   const rect = bar.getBoundingClientRect();
   const x = Math.min(Math.max(0, clientX - rect.left), rect.width);
   audio.currentTime = (x / rect.width) * audio.duration;
+}
+
+// Attach both touch (passive:false for preventDefault) and mouse events to a bar
+function _attachSeekListeners(bar, onSeekUpdate) {
+  let _active = false;
+
+  // ── Touch events (most reliable on mobile) ──────────────────────────
+  bar.addEventListener('touchstart', (e) => {
+    if (!audio.duration) return;
+    e.preventDefault(); // blocks scroll & pull-to-refresh during seek
+    e.stopPropagation();
+    _active = true;
+    _applySeek(bar, e.touches[0].clientX);
+    onSeekUpdate && onSeekUpdate();
+  }, { passive: false });
+
+  bar.addEventListener('touchmove', (e) => {
+    if (!_active) return;
+    e.preventDefault();
+    e.stopPropagation();
+    _applySeek(bar, e.touches[0].clientX);
+    onSeekUpdate && onSeekUpdate();
+  }, { passive: false });
+
+  bar.addEventListener('touchend', (e) => {
+    if (!_active) return;
+    e.preventDefault();
+    _active = false;
+    onSeekUpdate && onSeekUpdate();
+  }, { passive: false });
+
+  bar.addEventListener('touchcancel', () => { _active = false; }, { passive: true });
+
+  // ── Mouse events (desktop) ───────────────────────────────────────────
+  bar.addEventListener('mousedown', (e) => {
+    if (!audio.duration) return;
+    e.preventDefault();
+    _active = true;
+    _applySeek(bar, e.clientX);
+    onSeekUpdate && onSeekUpdate();
+
+    const onMove = (ev) => { if (_active) { _applySeek(bar, ev.clientX); onSeekUpdate && onSeekUpdate(); } };
+    const onUp = () => { _active = false; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+// Mini player bar seek
+function setupMiniSeek() {
+  const bar = document.getElementById('miniProgressBar');
+  if (!bar) return;
+  _attachSeekListeners(bar, () => {
+    if (!audio.duration) return;
+    const pct = (audio.currentTime / audio.duration * 100) + '%';
+    const fill = document.getElementById('progressFill');
+    if (fill) fill.style.width = pct;
+    document.getElementById('currentTime').textContent = fmtTime(audio.currentTime);
+  });
+}
+
+// Legacy click-only fallback (kept for any other callers)
+function seekSong(e) {
+  if (!audio.duration) return;
+  audio.currentTime = (e.offsetX / e.currentTarget.offsetWidth) * audio.duration;
+}
+
+// Fullscreen bar seek ─────────────────────────────────────────────────
+function setupFullscreenSeek() {
+  const bar = document.getElementById('npfsProgressBar');
+  if (!bar) return;
+  _attachSeekListeners(bar, () => updateFsProgress());
+}
+
+// Keep these stubs so nothing else breaks
+function startFsSeek() { }
+function moveFsSeek() { }
+function endFsSeek() { }
+
+function seekSongOnBar(bar, clientX) {
+  _applySeek(bar, clientX);
   updateFsProgress();
 }
 
@@ -845,7 +899,8 @@ function setVolume(v) { audio.volume = v; }
 
 audio.addEventListener('timeupdate', () => {
   if (!audio.duration) return;
-  document.getElementById('progressFill').style.width = (audio.currentTime / audio.duration * 100) + '%';
+  const pct = (audio.currentTime / audio.duration * 100) + '%';
+  document.getElementById('progressFill').style.width = pct;
   document.getElementById('currentTime').textContent = fmtTime(audio.currentTime);
   document.getElementById('totalTime').textContent = fmtTime(audio.duration);
   updateFsProgress();
@@ -1080,6 +1135,8 @@ function updateNowPlayingUI(song) {
 
 // ===== FULLSCREEN NOW PLAYING =====
 function openQueueFromFullscreen() {
+  const panel = document.getElementById('queuePanel');
+  if (panel) panel.classList.add('fullscreen');
   closeNowPlayingScreen();
   setTimeout(() => { toggleQueue(); }, 320); // wait for close animation
 }
@@ -1169,9 +1226,7 @@ function updateFsProgress() {
   if (!audio.duration) return;
   const pct = (audio.currentTime / audio.duration) * 100;
   const fill = document.getElementById('npfsProgressFill');
-  const thumb = document.getElementById('npfsProgressThumb');
   if (fill) fill.style.width = pct + '%';
-  if (thumb) thumb.style.left = pct + '%';
   document.getElementById('npfsCurrentTime').textContent = fmtTime(audio.currentTime);
   document.getElementById('npfsTotalTime').textContent = fmtTime(audio.duration);
 }
@@ -1287,15 +1342,17 @@ function updateLyricsPanel() {
 function toggleQueue() {
   const panel = document.getElementById('queuePanel');
   const isOpen = panel.classList.contains('hidden');
-  panel.classList.toggle('hidden');
-  // Sync active state on both possible queue buttons
-  ['queueBtn', 'queueDesktopBtn'].forEach(id => {
-    document.getElementById(id)?.classList.toggle('active', isOpen);
-  });
-  // Mobile backdrop
-  if (window.innerWidth <= 768) {
-    let backdrop = document.getElementById('queueBackdrop');
-    if (isOpen) {
+
+  if (isOpen) {
+    panel.classList.remove('hidden', 'closing');
+    if (window.innerWidth <= 768) {
+      panel.classList.add('fullscreen');
+    } else {
+      panel.classList.remove('fullscreen');
+    }
+    document.body.style.overflow = 'hidden';
+    if (window.innerWidth <= 768) {
+      let backdrop = document.getElementById('queueBackdrop');
       if (!backdrop) {
         backdrop = document.createElement('div');
         backdrop.id = 'queueBackdrop';
@@ -1303,25 +1360,105 @@ function toggleQueue() {
         backdrop.onclick = toggleQueue;
         document.body.appendChild(backdrop);
       }
-    } else {
-      backdrop?.remove();
     }
+    renderQueue();
+  } else {
+    panel.classList.add('closing');
+    const backdrop = document.getElementById('queueBackdrop');
+    backdrop?.remove();
+    panel.addEventListener('animationend', function onClose() {
+      panel.classList.add('hidden');
+      panel.classList.remove('closing', 'fullscreen');
+      document.body.style.overflow = '';
+    }, { once: true });
   }
-  if (isOpen) renderQueue();
+
+  // Sync active state on both possible queue buttons
+  ['queueBtn', 'queueDesktopBtn'].forEach(id => {
+    document.getElementById(id)?.classList.toggle('active', isOpen);
+  });
 }
 function renderQueue() {
   const nowEl = document.getElementById('queueNowPlaying');
   const listEl = document.getElementById('queueList');
   if (!nowEl || !listEl) return;
+
   const current = currentQueue[currentSongIndex];
-  nowEl.innerHTML = current ? queueItemHTML(current, -1, true) : '<div style="color:var(--text-muted);font-size:13px;padding:8px;">Nothing playing</div>';
+
+  // Now-playing card
+  if (current) {
+    nowEl.innerHTML = `
+      <div class="qp-now-card">
+        ${current.coverUrl
+        ? `<img class="qp-now-cover" src="${esc(current.coverUrl)}" alt="" />`
+        : `<div class="qp-now-cover-ph">🎵</div>`}
+        <div class="qp-now-meta">
+          <div class="qp-now-title">${esc(current.songName)}</div>
+          <div class="qp-now-artist">${esc(buildCreditsText(current))}</div>
+        </div>
+        <div class="qp-now-badge" aria-label="Playing">
+          <span class="qp-now-badge-bar" style="--spd:0.50s;height:8px"></span>
+          <span class="qp-now-badge-bar" style="--spd:0.35s;height:14px"></span>
+          <span class="qp-now-badge-bar" style="--spd:0.60s;height:10px"></span>
+          <span class="qp-now-badge-bar" style="--spd:0.45s;height:6px"></span>
+        </div>
+      </div>`;
+  } else {
+    nowEl.innerHTML = '<div class="qp-empty"><div class="qp-empty-icon">🎵</div><div class="qp-empty-text">Nothing playing</div></div>';
+  }
+
+  // Upcoming list
   const upcoming = currentQueue.slice(currentSongIndex + 1);
-  listEl.innerHTML = upcoming.length
-    ? upcoming.map((s, i) => queueItemHTML(s, currentSongIndex + 1 + i, false)).join('')
-    : '<div style="color:var(--text-muted);font-size:13px;padding:8px;">No songs in queue</div>';
+
+  // Update subtitle count
+  const sub = document.getElementById('qpSubtitle');
+  if (sub) sub.textContent = upcoming.length === 0 ? 'Queue is empty' : `${upcoming.length} song${upcoming.length !== 1 ? 's' : ''} up next`;
+
+  if (upcoming.length) {
+    listEl.innerHTML = upcoming.map((s, i) => {
+      const idx = currentSongIndex + 1 + i;
+      return `<div class="qp-item" onclick="jumpToQueue(${idx})" style="animation-delay:${i * 0.04}s">
+        ${s.coverUrl
+          ? `<img class="qp-item-cover" src="${esc(s.coverUrl)}" alt="" />`
+          : `<div class="qp-item-cover-ph">🎵</div>`}
+        <div class="qp-item-meta">
+          <div class="qp-item-title">${esc(s.songName)}</div>
+          <div class="qp-item-artist">${esc(buildCreditsText(s))}</div>
+        </div>
+        <span class="qp-item-num">${i + 1}</span>
+        <button class="qp-item-remove" onclick="event.stopPropagation(); removeFromQueue(${idx})" title="Remove">✕</button>
+      </div>`;
+    }).join('');
+  } else {
+    listEl.innerHTML = `<div class="qp-empty">
+      <div class="qp-empty-icon">🎶</div>
+      <div class="qp-empty-text">No songs queued up</div>
+    </div>`;
+  }
 
   // Also render embedded fullscreen queue
   renderFsQueue();
+}
+
+function queueItemHTML(song, idx, isNow) {
+  // Legacy wrapper kept for compatibility — now just calls renderQueue-style markup
+  if (isNow) {
+    return `<div class="qp-now-card">
+      ${song.coverUrl ? `<img class="qp-now-cover" src="${esc(song.coverUrl)}" alt="" />` : `<div class="qp-now-cover-ph">🎵</div>`}
+      <div class="qp-now-meta">
+        <div class="qp-now-title">${esc(song.songName)}</div>
+        <div class="qp-now-artist">${esc(buildCreditsText(song))}</div>
+      </div>
+    </div>`;
+  }
+  return `<div class="qp-item" onclick="jumpToQueue(${idx})">
+    ${song.coverUrl ? `<img class="qp-item-cover" src="${esc(song.coverUrl)}" alt="" />` : `<div class="qp-item-cover-ph">🎵</div>`}
+    <div class="qp-item-meta">
+      <div class="qp-item-title">${esc(song.songName)}</div>
+      <div class="qp-item-artist">${esc(buildCreditsText(song))}</div>
+    </div>
+    <button class="qp-item-remove" onclick="event.stopPropagation(); removeFromQueue(${idx})" title="Remove">✕</button>
+  </div>`;
 }
 
 function renderFsQueue() {
@@ -1385,13 +1522,7 @@ function removeFromQueue(idx) {
   renderQueue();
 }
 
-function jumpToQueue(idx) {
-  currentSongIndex = idx;
-  loadAndPlay();
-  renderQueue();
-  const panel = document.getElementById('queuePanel');
-  if (panel && !panel.classList.contains('hidden')) toggleQueue();
-}
+function jumpToQueue(idx) { currentSongIndex = idx; loadAndPlay(); renderQueue(); }
 
 // ===== LIKED SONGS =====
 async function loadLikedSongs() {
@@ -2204,7 +2335,9 @@ document.addEventListener('keydown', function (e) {
 
 // ===== TOAST & MSG =====
 function showToast(msg) {
-  // Toast notifications removed - keep function no-op to avoid breaking callers.
+  const existing = document.querySelector('.toast'); if (existing) existing.remove();
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2500);
 }
 function showMsg(id, msg) { const el = document.getElementById(id); if (el) el.textContent = msg; }
 
