@@ -1341,7 +1341,13 @@ function updateLyricsPanel() {
 // ===== QUEUE PANEL =====
 function toggleQueue() {
   const panel = document.getElementById('queuePanel');
+  if (!panel) return;
   const isOpen = panel.classList.contains('hidden');
+
+  if (panel._queueCloseTimer) {
+    window.clearTimeout(panel._queueCloseTimer);
+    panel._queueCloseTimer = null;
+  }
 
   if (isOpen) {
     panel.classList.remove('hidden', 'closing');
@@ -1366,11 +1372,22 @@ function toggleQueue() {
     panel.classList.add('closing');
     const backdrop = document.getElementById('queueBackdrop');
     backdrop?.remove();
-    panel.addEventListener('animationend', function onClose() {
+
+    let closed = false;
+    const hidePanel = () => {
+      if (closed) return;
+      closed = true;
       panel.classList.add('hidden');
       panel.classList.remove('closing', 'fullscreen');
       document.body.style.overflow = '';
+      panel._queueCloseTimer = null;
+    };
+
+    panel.addEventListener('animationend', function onClose() {
+      hidePanel();
     }, { once: true });
+
+    panel._queueCloseTimer = window.setTimeout(hidePanel, 400);
   }
 
   // Sync active state on both possible queue buttons
